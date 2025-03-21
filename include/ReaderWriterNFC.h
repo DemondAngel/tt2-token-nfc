@@ -8,6 +8,7 @@ int writeBlock(int block, uint8_t* dataBytes, uint8_t* uid, uint8_t uidLength);
 uint8_t * readBlock(int block, uint8_t * uid, uint8_t uidLength);
 int write(const char * mensaje);
 void read(void);
+bool detectCard(void);
 
 
 #endif
