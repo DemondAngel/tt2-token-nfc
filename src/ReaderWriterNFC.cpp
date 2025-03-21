@@ -231,3 +231,14 @@ int writeBlock(int block, uint8_t* dataBytes, uint8_t* uid, uint8_t uidLength) {
   
     }
 }
+
+bool detectCard() {
+  Serial.println("Acerque una tarjeta NFC para leer...");
+
+  uint8_t uid[] = { 0, 0, 0, 0, 0, 0, 0 };
+  uint8_t uidLength;
+
+  // Espera hasta que se detecte una tarjeta NFC
+  return nfc.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, &uidLength);
+  
+}
