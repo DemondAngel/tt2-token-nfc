@@ -5,16 +5,16 @@
 
 class SharedKey {
     private:
-        String _uuid_shared_key;
-        String _shared_key;
+        String _uuidSharedKey;
+        String _sharedKey;
 
     public:
-        SharedKey(String uuid_shared_key, String shared_key);
+        SharedKey(String uuidSharedKey, String sharedKey);
+        SharedKey();
         String getUuidSharedKey();
-        void setUuidSharedKey(String uuid_shared_key);
+        void setUuidSharedKey(String uuidSharedKey);
         String getSharedKey();
         void setSharedKey(String sharedKey);
-
 };
 
 #endif

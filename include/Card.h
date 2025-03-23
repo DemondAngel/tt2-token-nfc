@@ -5,19 +5,19 @@
 
 class Card {
     private: 
-        String _uuid_card;
-        String _uuid_token;
+        String _uuidCard;
+        String _uuidToken;
         String _token;
     
     public:
-        Card(String uuid_card, String uuid_token, String token);
-
+        Card(String uuidCard, String uuidToken, String token);
+    
         String getUuidCard();
-        void setUuidCard(String uuid_card);
+        void setUuidCard(String uuidCard);
         String getUuidToken();
-        void setUuidToken(String uuid_token);
+        void setUuidToken(String uuidToken);
         String getToken();
-        void setToken(String token);
+        void setToken(String token); 
 };
 
 #endif
