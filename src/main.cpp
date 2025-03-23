@@ -3,6 +3,7 @@
 //#include <CipherNFC.h>
 #include <Arduino.h>
 #include <CustomRequests.h>
+#include <StoreData.h>
 
 int regis = 0;
 
@@ -12,6 +13,8 @@ void setup() {
   Serial.begin(115200);
 
   pinMode(3, INPUT);
+  pinMode(4, OUTPUT);
+  pinMode(53, OUTPUT);
   
   lcd.begin(20, 4);
   lcd.setCursor(0,0);
@@ -38,11 +41,19 @@ void loop() {
       lcd.clear();
       lcd.setCursor(0,0);
       lcd.print("Registrando...");
-      connectToProxy();
+      
       const char* uuidCard = registerCard();
       if(uuidCard != NULL){
         Serial.println("Esta es el uuId nuevo de la tarjeta");
         Serial.println(uuidCard);
+
+        Card card(uuidCard, "", "");
+
+        card = generateToken(card);
+
+        Serial.println("ESte es el token de la tarjeta");
+        Serial.println(card.getToken());
+
         lcd.clear();
         lcd.setCursor(0,0);
         lcd.print("Tarjeta");
@@ -54,7 +65,7 @@ void loop() {
         lcd.setCursor(0,0);
         lcd.print("Hubo un error :()");
       }
-      disconnect();
+      
     }
 
   }

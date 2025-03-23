@@ -59,7 +59,7 @@ int removePadding(uint8_t *data, size_t &len) {
     return len - paddingLength;      
 }
 
-uint8_t * encryptNFCDATA(char * message){
+uint8_t * encryptNFCData(char * message){
     
     Serial.println("Este es el mensaje a cifrar");
     Serial.println(message);
@@ -85,7 +85,7 @@ uint8_t * encryptNFCDATA(char * message){
     return encryptedMessage;
 }
 
-char * decryptNFCDATA(uint8_t * data){
+char * decryptNFCData(uint8_t * data){
 
     struct AES_ctx ctx;
     size_t lenData = strlen(data);

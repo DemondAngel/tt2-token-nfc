@@ -2,18 +2,15 @@
 #define CUSTOM_REQUESTS_H
 
 #include <Card.h>
-#include <SharedKey.h>
+#include <DeviceInfo.h>
 #include <Arduino.h>
 #include <ArduinoJson.h>
 
 JsonDocument parseJson();
 bool connectToProxy();
-String retrieveResponse();
-String retrieveToken();
-void storeToken(String token);
 const char * registerCard();
-const char * authNFC(String username, String pass);
-Card generateToken(Card card, String uuid_nfc);
+DeviceInfo authNFC(String userName, String pass);
+Card generateToken(Card card);
 bool validateToken(Card card);
 SharedKey getSharedKeyNFC(String uuid_shared_key);
 void disconnect();
