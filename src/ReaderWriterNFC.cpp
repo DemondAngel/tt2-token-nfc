@@ -3,14 +3,21 @@
 #include <Adafruit_PN532.h>
 #include <math.h>
 
-#define SDA_PIN 20
-#define SCL_PIN 21
+#if TARGET_PLATFORM == 0
+  #define SDA_PIN 20
+  #define SCL_PIN 21
+
+#else
+  #define SDA_PIN 21
+  #define SCL_PIN 22
+#endif
 
 uint8_t key[] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
 
 Adafruit_PN532 nfc(SDA_PIN, SCL_PIN);
 
 void initPN532(){
+    Wire.begin();
     nfc.begin();
 
     uint32_t versiondata = nfc.getFirmwareVersion();

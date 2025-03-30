@@ -1,54 +1,101 @@
 #include "DeviceInfo.h"
 
+DeviceInfo::DeviceInfo() {
+    _uuid[0] = '\0';
+    _userName[0] = '\0';
+    _pass[0] = '\0';
+    _token[0] = '\0';
+    // Si SharedKey tiene un constructor vacío, se puede inicializar de esta manera
+}
+
 // Constructor
-DeviceInfo::DeviceInfo(String uuid, String userName, String pass, String token, SharedKey sharedKey) {
-    this->_uuid = uuid;
-    this->_userName = userName;
-    this->_pass = pass;
-    this->_token = token;
-    this->_sharedKey = sharedKey;
+DeviceInfo::DeviceInfo(const char* uuid, const char* userName, const char* pass, const char* token, const SharedKey& sharedKey)
+    : _sharedKey(sharedKey) {
+    strncpy(_uuid, uuid, UUID_LENGTH - 1);
+    _uuid[UUID_LENGTH - 1] = '\0';
+    strncpy(_userName, userName, USERNAME_LENGTH - 1);
+    _userName[USERNAME_LENGTH - 1] = '\0';
+    strncpy(_pass, pass, PASS_LENGTH - 1);
+    _pass[PASS_LENGTH - 1] = '\0';
+    strncpy(_token, token, DEVICE_TOKEN_LENGTH - 1);
+    _token[DEVICE_TOKEN_LENGTH - 1] = '\0';
 }
 
-// Setter y Getter para UUID
-void DeviceInfo::setUuid(String uuid) {
-    this->_uuid = uuid;
+// Setter para UUID
+void DeviceInfo::setUuid(const char* uuid) {
+    strncpy(_uuid, uuid, UUID_LENGTH - 1);
+    _uuid[UUID_LENGTH - 1] = '\0';
 }
 
-String DeviceInfo::getUuid() {
-    return this->_uuid;
+// Getter para UUID
+const char* DeviceInfo::getUuid() const {
+    return _uuid;
 }
 
-// Setter y Getter para UserName
-void DeviceInfo::setUserName(String userName) {
-    this->_userName = userName;
+// Setter para UserName
+void DeviceInfo::setUserName(const char* userName) {
+    strncpy(_userName, userName, USERNAME_LENGTH - 1);
+    _userName[USERNAME_LENGTH - 1] = '\0';
 }
 
-String DeviceInfo::getUserName() {
-    return this->_userName;
+// Getter para UserName
+const char* DeviceInfo::getUserName() const {
+    return _userName;
 }
 
-// Setter y Getter para Pass
-void DeviceInfo::setPass(String pass) {
-    this->_pass = pass;
+// Setter para Pass
+void DeviceInfo::setPass(const char* pass) {
+    strncpy(_pass, pass, PASS_LENGTH - 1);
+    _pass[PASS_LENGTH - 1] = '\0';
 }
 
-String DeviceInfo::getPass() {
-    return this->_pass;
+// Getter para Pass
+const char* DeviceInfo::getPass() const {
+    return _pass;
 }
 
-// Setter y Getter para Token
-void DeviceInfo::setToken(String token) {
-    this->_token = token;
+// Setter para Token (devuelve bool para indicar éxito/fracaso)
+bool DeviceInfo::setToken(const char* token) {
+    if (strlen(token) < DEVICE_TOKEN_LENGTH) {
+        strncpy(_token, token, DEVICE_TOKEN_LENGTH - 1);
+        _token[DEVICE_TOKEN_LENGTH - 1] = '\0';
+        return true; // Éxito
+    } else {
+        // El token es demasiado largo para el buffer
+        _token[0] = '\0'; // O podrías truncar, dependiendo de la necesidad
+        return false; // Fracaso
+    }
 }
 
-String DeviceInfo::getToken() {
-    return this->_token;
+// Getter para Token
+const char* DeviceInfo::getToken() const {
+    return _token;
 }
 
-void DeviceInfo::setSharedKey(SharedKey sharedKey){
-    this->_sharedKey = sharedKey;
+// Setter para SharedKey (se pasa y almacena por valor)
+void DeviceInfo::setSharedKey(const SharedKey& sharedKey) {
+    _sharedKey = sharedKey; // La copia se realiza automáticamente
 }
 
-SharedKey DeviceInfo::getSharedKey(){
-    return this->_sharedKey;
+// Getter para SharedKey
+SharedKey DeviceInfo::getSharedKey() const {
+    return _sharedKey; // Devuelve una copia del objeto SharedKey
+}
+
+// Método toString() (como se definió anteriormente)
+String DeviceInfo::toString() const {
+    String output = "DeviceInfo: { ";
+    output += "UUID: ";
+    output += _uuid;
+    output += ", UserName: ";
+    output += _userName;
+    output += ", Pass: *****"; // No mostrar la contraseña por seguridad
+    output += ", Token: ";
+    output += _token;
+    output += ", SharedKey: { UUID: ";
+    output += _sharedKey.getUuidSharedKey();
+    output += ", Key: *****, IV: ";
+    output += _sharedKey.getIv();
+    output += " } }";
+    return output;
 }

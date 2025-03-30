@@ -6,13 +6,65 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
 
-JsonDocument parseJson();
-bool connectToProxy();
-const char * registerCard();
-DeviceInfo authNFC(String userName, String pass);
-Card generateToken(Card card);
-bool validateToken(Card card);
-SharedKey getSharedKeyNFC(String uuid_shared_key);
-void disconnect();
+#if TARGET_PLATFORM == 0
+  #include <Ethernet.h>
+  const int pinETH = 53;
+#else
+  #include <WiFi.h>
+  #include <HTTPClient.h>
+#endif
+
+class CustomRequests {
+private:
+
+    #if TARGET_PLATFORM == 0
+      const int _pinETH = pinETH; // Pin para control de Ethernet (si aplica)
+      EthernetClient _client;
+      const IPAddress _arduinoIP; // Ahora son miembros const, se inicializan en el constructor
+      const IPAddress _proxyIP;
+      const int _proxyPort = 8080;
+      const byte _mac[6] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
+    #else
+      HTTPClient _http;
+      int _httpCode = 0;
+      const char * _ssid;
+      const char * _pass;
+    #endif
+
+    const char * _HOST = "8080-idx-tt2-token-protection-1740550210828.cluster-wfwbjypkvnfkaqiqzlu3ikwjhe.cloudworkstations.dev";
+    
+    DeviceInfo _currentDeviceInfo; // Información del dispositivo cargada
+
+    // Métodos privados para uso interno
+    JsonDocument _parseJson();
+    void _prepareQuery(const char * method, const char * uri, const char * contentType, bool auth, const char * token, const JsonDocument& docRequest);
+    #if TARGET_PLATFORM == 0
+      bool _connectToProxy();
+    #else
+      bool _connectToWiFi();
+    #endif
+
+    bool _connect();
+
+    void _disconnect();
+    void _authNFC();
+
+public:
+    // Constructor - requiere una instancia de StoreData
+    #if TARGET_PLATFORM == 0
+      CustomRequests(IPAddress arduinoIP, IPAddress proxyIP);
+    #else 
+      CustomRequests(const char * ssid, const char * pass);
+    #endif
+
+    // Métodos públicos para realizar las acciones
+    const char * registerCard();
+    Card generateToken(Card& card);
+    //bool validateToken(const Card& card);
+    //SharedKey getSharedKeyNFC(const char * uuidSharedKey);
+
+    // Getter para la información del dispositivo (opcional)
+    const DeviceInfo& getCurrentDeviceInfo();
+};
 
 #endif

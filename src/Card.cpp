@@ -1,31 +1,66 @@
-#include "Card.h"
+#include <Card.h>
+#include <string.h>
+#include <Arduino.h> // Para Serial (opcional, para mensajes de advertencia)
 
-Card::Card(String uuidCard, String uuidToken, String token) {
-    this->_uuidCard = uuidCard;
-    this->_uuidToken = uuidToken;
-    this->_token = token;
+Card::Card() {
+    _uuidCard[0] = '\0';
+    _uuidToken[0] = '\0';
+    _token[0] = '\0';
 }
 
-String Card::getUuidCard() {
-    return this->_uuidCard;
+Card::Card(const char* uuidCard, const char* uuidToken, const char* token) {
+    setUuidCard(uuidCard);
+    setUuidToken(uuidToken);
+    setToken(token);
 }
 
-void Card::setUuidCard(String uuidCard) {
-    this->_uuidCard = uuidCard;
+void Card::setUuidCard(const char* uuidCard) {
+    if (uuidCard != nullptr) {
+        strncpy(_uuidCard, uuidCard, CARD_UUID_LENGTH - 1);
+        _uuidCard[CARD_UUID_LENGTH - 1] = '\0';
+    } else {
+        _uuidCard[0] = '\0';
+    }
 }
 
-String Card::getUuidToken() {
-    return this->_uuidToken;
+const char* Card::getUuidCard() const {
+    return _uuidCard;
 }
 
-void Card::setUuidToken(String uuidToken) {
-    this->_uuidToken = uuidToken;
+void Card::setUuidToken(const char* uuidToken) {
+    if (uuidToken != nullptr) {
+        strncpy(_uuidToken, uuidToken, TOKEN_UUID_LENGTH - 1);
+        _uuidToken[TOKEN_UUID_LENGTH - 1] = '\0';
+    } else {
+        _uuidToken[0] = '\0';
+    }
 }
 
-String Card::getToken() {
-    return this->_token;
+const char* Card::getUuidToken() const {
+    return _uuidToken;
 }
 
-void Card::setToken(String token) {
-    this->_token = token;
+bool Card::setToken(const char* token) {
+    if (token != nullptr) {
+        size_t len = strlen(token);
+        if (len < CARD_TOKEN_LENGTH) {
+            strncpy(_token, token, CARD_TOKEN_LENGTH - 1);
+            _token[CARD_TOKEN_LENGTH - 1] = '\0';
+            return true; // Éxito
+        } else {
+            // Opción: Truncar la cadena (sin indicar error)
+            strncpy(_token, token, CARD_TOKEN_LENGTH - 1);
+            _token[CARD_TOKEN_LENGTH - 1] = '\0';
+            // Opcional: Mostrar una advertencia (si es útil para depuración)
+            // Serial.println("Advertencia: Token demasiado largo, truncado.");
+            return false; // Fallo (se truncó)
+        }
+    } else {
+        _token[0] = '\0';
+        return true; // Considerar éxito al establecer una cadena vacía
+    }
+}
+
+const char* Card::getToken() const {
+    return _token;
 }
