@@ -1,110 +1,252 @@
 #include <CipherNFC.h>
-#include <uECC.h>
-#include "aes.hpp"
+#include <AES.h>
+#include <string.h>
 
-/*Dummy data*/
-uint8_t aesKey[16] = {0x01, 0xC3, 0x25, 0xB5, 0x3C, 0x4F, 0xD8, 0x8A, 0xC1, 0x5B, 0x22, 0xDD, 0xD4, 0xEE, 0x30, 0x5D};  // La clave generada a través de ECC
-uint8_t aesIV[16] = { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F };
+EncryptedMessage::EncryptedMessage() : _len(0)
+{
+    memset(_data, 0, sizeof(_data));
+}
 
-/* Mensaje de ejemplo */
-uint8_t encryptedMessage[512];
-uint8_t decryptedMessage[512];
+EncryptedMessage::EncryptedMessage(const uint8_t *data, size_t len) : _len(0)
+{
+    memset(_data, 0, sizeof(_data));
+    setData(data, len);
+}
 
-const struct uECC_Curve_t *curve = uECC_secp256r1();
-// Claves para testing
-uint8_t privateKey[32] = {
-    0x9B, 0x1E, 0xA7, 0x60, 0x1E, 0x8D, 0xC5, 0xB2,
-    0x3F, 0x47, 0x7C, 0x28, 0x4B, 0xE2, 0xA4, 0x58,
-    0x22, 0x14, 0x0E, 0x89, 0x49, 0xD3, 0x6F, 0x27,
-    0x61, 0x9A, 0x14, 0x92, 0xA3, 0xDC, 0x3D, 0xD4
-  };
+void EncryptedMessage::setData(const uint8_t *data, size_t len)
+{
+    if (len > sizeof(_data))
+    {
+        len = sizeof(_data);
+        // Consider adding a warning here if the data is truncated
+    }
+    memcpy(_data, data, len);
+    _len = len;
+}
 
-uint8_t publicKey[64] = {
-    0x04, 0x96, 0x76, 0x98, 0x12, 0xA0, 0x32, 0x71,
-    0x45, 0x8E, 0xB5, 0x36, 0x15, 0x3B, 0x65, 0x49,
-    0x9E, 0xF4, 0x1C, 0x24, 0xC3, 0x71, 0xB9, 0x09,
-    0x8F, 0x64, 0xC3, 0xD1, 0xC9, 0x31, 0x76, 0x56,
-    0x7F, 0xBB, 0x5A, 0x91, 0x2F, 0x4F, 0xE2, 0x51,
-    0xD7, 0x67, 0x71, 0x9A, 0x44, 0x3F, 0x93, 0xAD,
-    0x82, 0x47, 0x23, 0x8E, 0x76, 0x6C, 0xA2, 0xD7,
-    0x3B, 0x8A, 0x4C, 0x94, 0x38, 0xE1, 0x13, 0x9B
-};
+const uint8_t *EncryptedMessage::getData()
+{
+    return _data;
+}
 
-void printHex(const char *label, const uint8_t *data, size_t len) { //Testint purposes
+void EncryptedMessage::setLen(size_t len)
+{
+    if (len > sizeof(_data))
+    {
+        _len = sizeof(_data);
+        // Consider adding a warning here if the length is too large
+    }
+    else
+    {
+        _len = len;
+    }
+}
+
+const size_t EncryptedMessage::getLen()
+{
+    return _len;
+}
+
+// Implementación de KeysInformation
+KeysInformation::KeysInformation()
+{
+    memset(aesKey, 0, sizeof(aesKey));
+    memset(aesIv, 0, sizeof(aesIv));
+}
+
+KeysInformation::KeysInformation(const SharedKey &sharedKey)
+{
+    /*
+    if(deviceInfo.getSharedKey().getSharedKey() != "" && deviceInfo.getSharedKey().getIv() != ""){
+
+        String sharedKey = deviceInfo.getSharedKey().getSharedKey();
+        String ivKey = deviceInfo.getSharedKey().getIv();
+        int sharedKeySize = sharedKey.length();
+        int ivKeySize = ivKey.length();
+
+        keysInformation = KeysInformation(sharedKeySize, ivKeySize);
+
+        for(int i = 0; i < sharedKeySize; i++){
+            keysInformation.aesKey[i] = (uint8_t) sharedKey[i];
+            keysInformation.aesIv[i] = (uint8_t) ivKey[i];
+        }
+
+    }*/
+
+    memset(aesKey, 0, sizeof(aesKey));
+    memset(aesIv, 0, sizeof(aesIv));
+    setAesKey(reinterpret_cast<const uint8_t *>(sharedKey.getSharedKey()));
+    setAesIv(reinterpret_cast<const uint8_t *>(sharedKey.getIv()));
+}
+
+void KeysInformation::setAesKey(const uint8_t *key)
+{
+    if (key != nullptr)
+    {
+        size_t len = strlen(reinterpret_cast<const char *>(key));
+        if (len >= sizeof(aesKey))
+        {
+            len = sizeof(aesKey) - 1; // Ensure null termination
+            // Consider adding a warning here if the key is truncated
+        }
+        memcpy(aesKey, key, len);
+        aesKey[len] = '\0'; // Ensure null termination for string operations if needed
+    }
+    else
+    {
+        memset(aesKey, 0, sizeof(aesKey));
+    }
+}
+
+const uint8_t *KeysInformation::getAesKey()
+{
+    return aesKey;
+}
+
+void KeysInformation::setAesIv(const uint8_t *iv)
+{
+    if (iv != nullptr)
+    {
+        size_t len = strlen(reinterpret_cast<const char *>(iv));
+        if (len >= sizeof(aesIv))
+        {
+            len = sizeof(aesIv) - 1; // Ensure null termination
+            // Consider adding a warning here if the IV is truncated
+        }
+        memcpy(aesIv, iv, len);
+        aesIv[len] = '\0'; // Ensure null termination for string operations if needed
+    }
+    else
+    {
+        memset(aesIv, 0, sizeof(aesIv));
+    }
+}
+
+const uint8_t *KeysInformation::getAesIv()
+{
+    return aesIv;
+}
+
+void EncryptionNFC::printHex(const char *label, const uint8_t *data, const size_t len)
+{
     Serial.print(label);
-    Serial.print(": ");
-    for (size_t i = 0; i < len; i++) {
-        if (data[i] < 16) Serial.print("0");
+    for (size_t i = 0; i < len; i++)
+    {
+        if (data[i] < 0x10)
+        {
+            Serial.print("0");
+        }
         Serial.print(data[i], HEX);
         Serial.print(" ");
     }
     Serial.println();
 }
 
-// Función de padding PKCS7
-void addPadding(uint8_t *data, size_t &len, size_t blockSize) {
-    // Calcular el número de bytes de relleno necesarios
-    size_t padding = blockSize - (len % blockSize);
-    for (size_t i = len; i < len + padding; i++) {
-        data[i] = (uint8_t)padding; // Relleno con el número de bytes de padding
+EncryptionNFC::EncryptionNFC() {}
+
+EncryptionNFC::EncryptionNFC(const KeysInformation &keysInformation, const EncryptedMessage &encryptedMessage)
+    : _keysInformation(keysInformation), _encryptedMessage(encryptedMessage) {}
+
+void EncryptionNFC::encryptNFCData(const char *message)
+{
+    if (_keysInformation.getAesIv() != nullptr && _keysInformation.getAesIv()[0] != '\0' &&
+        _keysInformation.getAesKey() != nullptr && _keysInformation.getAesKey()[0] != '\0')
+    {
+        Serial.println(F("Este es el mensaje a cifrar"));
+        Serial.println(message);
+
+        size_t messageLength = strlen(message);
+        size_t paddedLength = ((messageLength / 16) + 1) * 16;
+
+        Serial.println("paddedLength");
+        Serial.println(paddedLength);
+
+        _encryptedMessage.setLen(paddedLength);
+        uint8_t messageArray[513];
+
+        memcpy(messageArray, message, messageLength);
+        uint8_t paddingValue = paddedLength - messageLength;
+        for (size_t i = messageLength; i < paddedLength; i++)
+        {
+            messageArray[i] = paddingValue;
+        }
+
+        AESTiny256 aes256;
+        aes256.setKey(_keysInformation.getAesKey(), 32);
+        uint8_t outputData[513];
+        aes256.encryptBlock(outputData, messageArray);
+        //_encryptedMessage.setData(outputData, paddedLength);
+
+        printHex("Mensaje cifrado", outputData, _encryptedMessage.getLen());
+        Serial.println(F("Longitud del mensaje cifrado"));
+        Serial.println(_encryptedMessage.getLen());
     }
-    len += padding; // Actualizar la longitud de los datos
-}
-
-int removePadding(uint8_t *data, size_t &len) {
-    int paddingLength = data[len - 1]; // Último byte indica cuántos bytes son padding
-    Serial.println("Tamanio de padding");
-    Serial.println(paddingLength);
-    if (paddingLength > 16) return len;   // Previene errores si el padding es inválido
-    return len - paddingLength;      
-}
-
-uint8_t * encryptNFCData(char * message){
-    
-    Serial.println("Este es el mensaje a cifrar");
-    Serial.println(message);
-    /*
-    if (uECC_shared_secret(publicKey, privateKey, aesKey, curve)) {
-        Serial.println("Clave AES generada con éxito.");
-        printHex("Clave AES cifrada con ECC", aesKey, 16);
-    } else {
-        Serial.println("Error generando clave AES con ECC.");
-        return NULL;
-    }*/
-
-    size_t messageLength = strlen(message);
-    size_t paddedLength = messageLength;
-    addPadding((uint8_t*)message, paddedLength, 16); 
-
-    struct AES_ctx ctx;
-    AES_init_ctx_iv(&ctx, aesKey, aesIV);
-    memcpy(encryptedMessage, message, messageLength);
-    AES_CBC_encrypt_buffer(&ctx, encryptedMessage, messageLength);
-    printHex("Mensaje cifrado", encryptedMessage, messageLength);
-
-    return encryptedMessage;
-}
-
-char * decryptNFCData(uint8_t * data){
-
-    struct AES_ctx ctx;
-    size_t lenData = strlen(data);
-    Serial.println("Len data");
-    Serial.println(lenData);
-    AES_init_ctx_iv(&ctx, aesKey, aesIV);
-    memcpy(decryptedMessage, encryptedMessage, lenData);
-    AES_CBC_decrypt_buffer(&ctx, decryptedMessage, lenData);
-
-    int realLength = removePadding(decryptedMessage, lenData);
-    Serial.println("ReaLength");
-    Serial.println(realLength);
-    // Mostrar mensaje descifrado
-    Serial.print("Texto descifrado: ");
-    for (int i = 0; i < realLength; i++) {
-        Serial.print((char)decryptedMessage[i]);
+    else
+    {
+        Serial.println(F("Error: Clave AES o IV no válidos (vacíos)."));
     }
-    Serial.println();
-    
+}
 
-    return NULL;
+const char *EncryptionNFC::decryptNFCData()
+{
+    // La función de descifrado no necesita cambios en este aspecto,
+    // ya que trabaja con los datos cifrados que ya están en _encryptedMessage.
+    if (_keysInformation.getAesIv() != nullptr && _keysInformation.getAesIv()[0] != '\0' &&
+        _keysInformation.getAesKey() != nullptr && _keysInformation.getAesKey()[0] != '\0')
+    {
+
+        Serial.println(F("Inicializando descifrado"));
+
+        size_t encryptedLength = _encryptedMessage.getLen();
+        if (encryptedLength == 0)
+        {
+            Serial.println(F("Advertencia: No hay datos para descifrar."));
+            return nullptr;
+        }
+
+        AESTiny256 aes256;
+        const size_t keySize = 32;
+        aes256.setKey(_keysInformation.getAesKey(),keySize);
+        printHex("Llave de descifrado", _keysInformation.getAesKey(), keySize);
+        uint8_t decrypted[513];
+        aes256.decryptBlock(decrypted, _encryptedMessage.getData());
+
+        if (decrypted != nullptr)
+        {
+            uint8_t paddingValue = decrypted[encryptedLength - 1];
+            printHex("Mensaje a descifrado", decrypted, _encryptedMessage.getLen());
+            if (paddingValue > 0 && paddingValue <= encryptedLength)
+            {
+                size_t realLength = encryptedLength - paddingValue;
+                Serial.print(F("Real Length: "));
+                Serial.println(realLength);
+                Serial.println(F("Convirtiendo"));
+                char result[realLength+1];
+                if (result == nullptr)
+                {
+                    Serial.println(F("Error al asignar memoria para el resultado del descifrado."));
+                    return nullptr;
+                }
+                memcpy(result, decrypted, realLength);
+                result[realLength] = '\0';
+                Serial.println(result);
+                return result;
+            }
+            else
+            {
+                Serial.println(F("Error: Padding PKCS7 inválido."));
+                return nullptr;
+            }
+        }
+        else
+        {
+            Serial.println(F("Error durante el descifrado con AESLib."));
+            return nullptr;
+        }
+    }
+    else
+    {
+        Serial.println(F("Error: Clave AES o IV no válidos (vacíos)."));
+        return nullptr;
+    }
 }
