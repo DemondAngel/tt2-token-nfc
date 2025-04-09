@@ -24,7 +24,7 @@ void EncryptedMessage::setData(const uint8_t *data, size_t len)
     _len = len;
 }
 
-const uint8_t *EncryptedMessage::getData()
+ uint8_t *EncryptedMessage::getData()
 {
     return _data;
 }
@@ -51,7 +51,6 @@ const size_t EncryptedMessage::getLen()
 KeysInformation::KeysInformation()
 {
     memset(aesKey, 0, sizeof(aesKey));
-    memset(aesIv, 0, sizeof(aesIv));
 }
 
 KeysInformation::KeysInformation(const SharedKey &sharedKey)
@@ -74,9 +73,7 @@ KeysInformation::KeysInformation(const SharedKey &sharedKey)
     }*/
 
     memset(aesKey, 0, sizeof(aesKey));
-    memset(aesIv, 0, sizeof(aesIv));
     setAesKey(reinterpret_cast<const uint8_t *>(sharedKey.getSharedKey()));
-    setAesIv(reinterpret_cast<const uint8_t *>(sharedKey.getIv()));
 }
 
 void KeysInformation::setAesKey(const uint8_t *key)
@@ -103,30 +100,6 @@ const uint8_t *KeysInformation::getAesKey()
     return aesKey;
 }
 
-void KeysInformation::setAesIv(const uint8_t *iv)
-{
-    if (iv != nullptr)
-    {
-        size_t len = strlen(reinterpret_cast<const char *>(iv));
-        if (len >= sizeof(aesIv))
-        {
-            len = sizeof(aesIv) - 1; // Ensure null termination
-            // Consider adding a warning here if the IV is truncated
-        }
-        memcpy(aesIv, iv, len);
-        aesIv[len] = '\0'; // Ensure null termination for string operations if needed
-    }
-    else
-    {
-        memset(aesIv, 0, sizeof(aesIv));
-    }
-}
-
-const uint8_t *KeysInformation::getAesIv()
-{
-    return aesIv;
-}
-
 void EncryptionNFC::printHex(const char *label, const uint8_t *data, const size_t len)
 {
     Serial.print(label);
@@ -149,8 +122,7 @@ EncryptionNFC::EncryptionNFC(const KeysInformation &keysInformation, const Encry
 
 void EncryptionNFC::encryptNFCData(const char *message)
 {
-    if (_keysInformation.getAesIv() != nullptr && _keysInformation.getAesIv()[0] != '\0' &&
-        _keysInformation.getAesKey() != nullptr && _keysInformation.getAesKey()[0] != '\0')
+    if (_keysInformation.getAesKey() != nullptr && _keysInformation.getAesKey()[0] != '\0')
     {
         Serial.println(F("Este es el mensaje a cifrar"));
         Serial.println(message);
@@ -160,6 +132,8 @@ void EncryptionNFC::encryptNFCData(const char *message)
 
         Serial.println("paddedLength");
         Serial.println(paddedLength);
+
+        printHex("Llave de cifrado", _keysInformation.getAesKey(), 16);
 
         _encryptedMessage.setLen(paddedLength);
         uint8_t messageArray[513];
@@ -171,13 +145,20 @@ void EncryptionNFC::encryptNFCData(const char *message)
             messageArray[i] = paddingValue;
         }
 
-        AESTiny256 aes256;
-        aes256.setKey(_keysInformation.getAesKey(), 32);
-        uint8_t outputData[513];
-        aes256.encryptBlock(outputData, messageArray);
-        //_encryptedMessage.setData(outputData, paddedLength);
+        printHex("Mensaje plano: ", messageArray, paddedLength);
 
-        printHex("Mensaje cifrado", outputData, _encryptedMessage.getLen());
+        AES128 aes128;
+        aes128.setKey(_keysInformation.getAesKey(), 16);
+
+        uint8_t outputData[513];
+
+        for (size_t i = 0; i < paddedLength; i += 16) {
+            aes128.encryptBlock(&outputData[i], &messageArray[i]);
+        }
+
+        _encryptedMessage.setData(outputData, paddedLength);
+
+        printHex("Mensaje cifrado: ", outputData, _encryptedMessage.getLen());
         Serial.println(F("Longitud del mensaje cifrado"));
         Serial.println(_encryptedMessage.getLen());
     }
@@ -191,8 +172,7 @@ const char *EncryptionNFC::decryptNFCData()
 {
     // La función de descifrado no necesita cambios en este aspecto,
     // ya que trabaja con los datos cifrados que ya están en _encryptedMessage.
-    if (_keysInformation.getAesIv() != nullptr && _keysInformation.getAesIv()[0] != '\0' &&
-        _keysInformation.getAesKey() != nullptr && _keysInformation.getAesKey()[0] != '\0')
+    if (_keysInformation.getAesKey() != nullptr && _keysInformation.getAesKey()[0] != '\0')
     {
 
         Serial.println(F("Inicializando descifrado"));
@@ -204,18 +184,22 @@ const char *EncryptionNFC::decryptNFCData()
             return nullptr;
         }
 
-        AESTiny256 aes256;
-        const size_t keySize = 32;
-        aes256.setKey(_keysInformation.getAesKey(),keySize);
+        AES128 aes128;
+        const size_t keySize = 16;
+        aes128.setKey(_keysInformation.getAesKey(),keySize);
         printHex("Llave de descifrado", _keysInformation.getAesKey(), keySize);
         uint8_t decrypted[513];
-        aes256.decryptBlock(decrypted, _encryptedMessage.getData());
+        uint8_t* encryptedData = _encryptedMessage.getData();
+
+        for (size_t i = 0; i < encryptedLength; i += 16) {
+            aes128.decryptBlock(&decrypted[i], &encryptedData[i]);
+        }
 
         if (decrypted != nullptr)
         {
             uint8_t paddingValue = decrypted[encryptedLength - 1];
-            printHex("Mensaje a descifrado", decrypted, _encryptedMessage.getLen());
-            if (paddingValue > 0 && paddingValue <= encryptedLength)
+            printHex("Mensaje a descifrado: ", decrypted, _encryptedMessage.getLen());
+            if (paddingValue > 0)
             {
                 size_t realLength = encryptedLength - paddingValue;
                 Serial.print(F("Real Length: "));
@@ -249,4 +233,9 @@ const char *EncryptionNFC::decryptNFCData()
         Serial.println(F("Error: Clave AES o IV no válidos (vacíos)."));
         return nullptr;
     }
+}
+
+EncryptedMessage EncryptionNFC::getEncryptedMessage()
+{
+    return _encryptedMessage;
 }
