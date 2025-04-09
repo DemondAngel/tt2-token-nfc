@@ -15,7 +15,7 @@ class EncryptedMessage {
         ~EncryptedMessage() = default;
 
         void setData(const uint8_t *data, size_t len);
-        const uint8_t * getData();
+        uint8_t * getData();
 
         void setLen(size_t len);
         const size_t getLen();
@@ -25,8 +25,7 @@ class EncryptedMessage {
 class KeysInformation {
     private:
 
-        uint8_t aesKey[33];  // Puntero al mensaje cifrado
-        uint8_t aesIv[17];  // Puntero al mensaje cifrado
+        uint8_t aesKey[17];  // Puntero al mensaje cifrado
 
     public:
 
@@ -41,8 +40,6 @@ class KeysInformation {
         void setAesKey(const uint8_t * aesKey);
         const uint8_t * getAesKey();
 
-        void setAesIv(const uint8_t * aesKey);
-        const uint8_t * getAesIv();
 };
 
 class EncryptionNFC{
@@ -55,6 +52,7 @@ class EncryptionNFC{
 
         void printHex(const char *label, const uint8_t *data, const size_t len);
         void encryptNFCData(const char * message);
+        EncryptedMessage getEncryptedMessage();
         const char * decryptNFCData();
 };
 

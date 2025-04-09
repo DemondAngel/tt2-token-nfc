@@ -95,7 +95,6 @@ String DeviceInfo::toString() const {
     output += ", SharedKey: { UUID: ";
     output += _sharedKey.getUuidSharedKey();
     output += ", Key: *****, IV: ";
-    output += _sharedKey.getIv();
     output += " } }";
     return output;
 }

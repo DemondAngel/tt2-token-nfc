@@ -10,6 +10,7 @@
     {
 
         Serial.println(F("Leyendo info del lector NFC"));
+        Ethernet.init(pinETH);
         /*
         if (dataStore.activateSD()) {
             _currentDeviceInfo = dataStore.getDeviceInfo();
@@ -17,7 +18,7 @@
         dataStore.deactivateSD();
         */
 
-        SharedKey sharedKey("", "", "");
+        SharedKey sharedKey("", "");
         _currentDeviceInfo = DeviceInfo("nfc-reader", "demond", "1234567", "", sharedKey);
 
         Serial.println(F("Esta es la información del lector"));
@@ -27,11 +28,8 @@
     bool CustomRequests::_connectToProxy()
     {
         Serial.println("Iniciando Ethernet");
-        SPI.beginTransaction(SPISettings(4000000, MSBFIRST, SPI_MODE0));
-        digitalWrite(_pinETH, LOW);
         delay(10);
-        SPI.endTransaction();
-
+        
         Ethernet.begin(_mac, _arduinoIP);
 
         Serial.print(F("Dirección IP del Arduino: "));
@@ -42,7 +40,7 @@
 
 #else 
     CustomRequests::CustomRequests(const char * ssid, const char * pass) : _ssid(ssid), _pass(pass) {
-        SharedKey sharedKey("", "", "");
+        SharedKey sharedKey("", "");
         _currentDeviceInfo = DeviceInfo("nfc-reader", "demond", "1234567", "", sharedKey);
     
         Serial.println(F("Esta es la información del lector"));
@@ -247,7 +245,7 @@ void CustomRequests::_authNFC()
 
         if (!doc.isNull())
         {
-            SharedKey sharedKey(doc["sharedKeyUuid"].as<const char *>(), doc["sharedKey"].as<const char *>(), doc["iv"].as<const char *>());
+            SharedKey sharedKey(doc["sharedKeyUuid"].as<const char *>(), doc["sharedKey"].as<const char *>());
             _currentDeviceInfo.setSharedKey(sharedKey);
             _currentDeviceInfo.setPass(_currentDeviceInfo.getPass());
             _currentDeviceInfo.setUserName(_currentDeviceInfo.getUserName());
@@ -351,7 +349,7 @@ void CustomRequests::_disconnect()
 {
     #if TARGET_PLATFORM == 0
         _client.stop();
-        digitalWrite(pinETH, HIGH);
+        //digitalWrite(pinETH, HIGH);
         delay(10);
     #else
         _http.end();

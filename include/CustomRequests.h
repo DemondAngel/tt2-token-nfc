@@ -9,6 +9,8 @@
 #if TARGET_PLATFORM == 0
   #include <Ethernet.h>
   const int pinETH = 53;
+  const int w5500ResetPin = 22;
+const int   w5500InterruptPin = 2;
 #else
   #include <WiFi.h>
   #include <HTTPClient.h>
@@ -19,11 +21,13 @@ private:
 
     #if TARGET_PLATFORM == 0
       const int _pinETH = pinETH; // Pin para control de Ethernet (si aplica)
+      const int _rstPin = w5500ResetPin;
+      const int _intPin = w5500InterruptPin;
       EthernetClient _client;
       const IPAddress _arduinoIP; // Ahora son miembros const, se inicializan en el constructor
       const IPAddress _proxyIP;
       const int _proxyPort = 8080;
-      const byte _mac[6] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
+      const uint8_t _mac[6] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
     #else
       HTTPClient _http;
       int _httpCode = 0;

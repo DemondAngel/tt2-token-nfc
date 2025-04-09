@@ -16,7 +16,7 @@
   #define REGISTER_PIN 3
   #define RS 8
   #define EN 9
-  #define D4 14
+  #define D4 4
   #define D5 5
   #define D6 6
   #define D7 7
@@ -45,17 +45,20 @@
 
 LiquidCrystal lcd(RS, EN, D4, D5, D6, D7); // Pin definition of the LCD
 
+Adafruit_PN532 nfc(SDA_PIN, SCL_PIN);
+
+ReaderWriter nfcReader(nfc);
+
 void setup() {
   Serial.begin(115200);
 
   pinMode(REGISTER_PIN, INPUT);
-  //pinMode(pinETH, OUTPUT);
 
   lcd.begin(COLS, ROWS);
   lcd.setCursor(0, 0);
   lcd.print(F("Iniciando NFC"));
   Serial.println(F("Inicializando NFC"));
-  initPN532();
+  nfcReader.initPN532();
 
   lcd.clear();
   lcd.setCursor(0, 0);
@@ -74,7 +77,7 @@ void loop() {
     lcd.print(F("Acerca tarjeta."));
     Serial.println(F("Autenticando NFC"));
     
-    if (detectCard()) {
+    if (nfcReader.detectCard()) {
       lcd.clear();
       lcd.setCursor(0, 0);
       lcd.print(F("Registrando..."));
@@ -113,34 +116,16 @@ void loop() {
 
           encryptionNFC.encryptNFCData(card.getToken());
 
-          const char * decryptedMessage = encryptionNFC.decryptNFCData();
-
-          Serial.println("Este es el mensaje descifrado");
-          Serial.println(decryptedMessage);
-          /*
-          if (encryptedMessage.length != 0) {
-            Serial.println(F("Descifrando"));
-            String dataDecripted = decryptNFCData(deviceInfo);
-
-
-            if (dataDecripted != "") {
-              Serial.println(dataDecripted);
-
-              lcd.clear();
-              lcd.setCursor(0, 0);
-              lcd.print(F("Tarjeta"));
-              lcd.setCursor(0, 1);
-              lcd.print(F("Registrada"));
-            }
-
-
-          } else {
+          if(nfcReader.writeUuidCard(card.getUuidCard()) == 0 && nfcReader.writeUuidTokensVersion(card.getUuidToken()) == 0
+            && nfcReader.writeUuidSharedKey(request.getCurrentDeviceInfo().getSharedKey().getUuidSharedKey()) == 0 && nfcReader.writeToken(encryptionNFC.getEncryptedMessage().getData(), encryptionNFC.getEncryptedMessage().getLen()) == 0){
+            Serial.println("Datos guardos");
             lcd.clear();
-            lcd.setCursor(0, 0);
-            lcd.print(F("Error, verifica"));
-            lcd.setCursor(0, 1);
-            lcd.print(F("Encriptacion"));
-          }*/
+            lcd.setCursor(0,0);
+            lcd.print(F("Tarjeta"));
+            lcd.setCursor(0,1);
+            lcd.print(F("registrada"));    
+          }
+          
         
         } else {
           Serial.println(F("Error en recuperar la tarjeta"));
