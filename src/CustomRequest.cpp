@@ -5,25 +5,18 @@
     
     #include <SPI.h>
 
-    CustomRequests::CustomRequests(IPAddress arduinoIP, IPAddress proxyIP)
-    : _arduinoIP(arduinoIP), _proxyIP(proxyIP)
+    CustomRequests::CustomRequests(IPAddress arduinoIP, IPAddress proxyIP, DeviceInfo &currentDeviceInfo)
+    : _arduinoIP(arduinoIP), _proxyIP(proxyIP), _currentDeviceInfo(currentDeviceInfo)
     {
 
         Serial.println(F("Leyendo info del lector NFC"));
         Ethernet.init(pinETH);
-        /*
-        if (dataStore.activateSD()) {
-            _currentDeviceInfo = dataStore.getDeviceInfo();
-        }
-        dataStore.deactivateSD();
-        */
-
-        SharedKey sharedKey("", "");
-        _currentDeviceInfo = DeviceInfo("nfc-reader", "demond", "1234567", "", sharedKey);
 
         Serial.println(F("Esta es la información del lector"));
         Serial.println(_currentDeviceInfo.toString());
     }
+
+
 
     bool CustomRequests::_connectToProxy()
     {
@@ -39,9 +32,7 @@
     }
 
 #else 
-    CustomRequests::CustomRequests(const char * ssid, const char * pass) : _ssid(ssid), _pass(pass) {
-        SharedKey sharedKey("", "");
-        _currentDeviceInfo = DeviceInfo("nfc-reader", "demond", "1234567", "", sharedKey);
+    CustomRequests::CustomRequests(const char * ssid, const char * pass, DeviceInfo &currentDeviceInfo) : _ssid(ssid), _pass(pass), _currentDeviceInfo(currentDeviceInfo) {
     
         Serial.println(F("Esta es la información del lector"));
         Serial.println(_currentDeviceInfo.toString());
@@ -148,7 +139,7 @@ JsonDocument CustomRequests::_parseJson()
     #endif
 }
 
-void CustomRequests::_prepareQuery(const char *method, const char *uri, const char *contentType, bool auth, const char *token, const JsonDocument &docRequest)
+void CustomRequests::_prepareQuery(const char * method, const char * uri, const char * contentType, bool auth, const char * token, const JsonDocument &docRequest)
 {
     #if TARGET_PLATFORM == 0
         _client.print(method);
@@ -157,9 +148,8 @@ void CustomRequests::_prepareQuery(const char *method, const char *uri, const ch
         _client.print(F(" HTTP/1.1\r\n"));
         _client.print(F("Host: "));
         _client.print(_HOST);
-        _client.print(F("\r\nContent-Type: "));
-        _client.print(contentType);
-        _client.print(F("\r\n"));
+        _client.print("\r\n");
+        _client.print(F("Cache-Control: no-cache, no-store, must-revalidate\r\n"));
 
         if (auth)
         {
@@ -168,16 +158,38 @@ void CustomRequests::_prepareQuery(const char *method, const char *uri, const ch
             _client.print(F("\r\n"));
         }
 
-        _client.print(F("Content-Length: "));
-        _client.print(measureJsonPretty(docRequest));
-        _client.print(F("\r\nConnection: close \r\n\r\n"));
-        serializeJsonPretty(docRequest, _client);
+        if(strcmp(method, "POST") == 0){
+            Serial.println(F("Realizando una peticion POST"));
+            _client.print(F("Content-Type: "));
+            _client.print(contentType);
+            _client.print("\r\n");
+            _client.print(F("Content-Length: "));
+            _client.print(measureJsonPretty(docRequest));
+            _client.print(F("\r\nConnection: close \r\n\r\n"));
+            serializeJsonPretty(docRequest, _client);
+        }
+        else {
+            Serial.println(F("Realizando una petición GET"));
+            _client.print(F("Connection: close \r\n\r\n"));
+        }
+
+        _client.flush(); //Quitar la línea si traba mucho la operación
+
+        
     #else
         _http.begin(String(_HOST)+String(uri));
-        _http.addHeader(F("Content-Type"), contentType);
-        String json;
-        serializeJsonPretty(docRequest, json);
-        _httpCode = _http.POST(json);
+
+        if(strcmp(method, "POST") == 0){
+            _http.addHeader(F("Content-Type"), contentType);
+            _http.addHeader(F("Cache-Control"), F("no-cache, no-store, must-revalidate"));
+            String json;
+            serializeJsonPretty(docRequest, json);
+            _httpCode = _http.POST(json);
+        }
+        else {
+            _httpCode = _http.GET();
+        }
+
     #endif
 
 }
@@ -345,6 +357,67 @@ Card CustomRequests::generateToken(Card &card)
     return Card("", "", "");
 }
 
+SharedKey CustomRequests::getSharedKeyNFC(char * uuidSharedKey){
+    Serial.println(F("Requesting key"));
+
+    if (_currentDeviceInfo.getUserName() != nullptr && _currentDeviceInfo.getUserName()[0] != '\0' &&
+        _currentDeviceInfo.getPass() != nullptr && _currentDeviceInfo.getPass()[0] != '\0' &&
+        _currentDeviceInfo.getUuid() != nullptr && _currentDeviceInfo.getUuid()[0] != '\0')
+    {
+        if(_connect()){
+            JsonDocument docRequest;
+            
+            char uri[50];
+
+            for(int i = 0; i < 50; i++)
+                uri[i] = '\0';
+
+            strcpy(uri, "/api/shared-keys/");
+            char * url = strcat(uri, uuidSharedKey);
+            url[49] = '\0';
+            Serial.println(F("Este es el uri del sharedKey"));
+            Serial.println(url);
+            
+            _prepareQuery("GET", url, "application/json",true, _currentDeviceInfo.getToken(), docRequest);
+
+            Serial.println("Solicutd enviada");
+
+            JsonDocument doc = _parseJson();
+
+            if (doc["error"].is<JsonObject>())
+            {
+                JsonObject errorObj = doc["error"];
+                int status = errorObj["status"];
+                if (status == 401)
+                {
+                    Serial.println(F("Error de autorización"));
+                    _authNFC();
+                    if (_currentDeviceInfo.getUserName() != nullptr && _currentDeviceInfo.getUserName()[0] != '\0' &&
+                        _currentDeviceInfo.getPass() != nullptr && _currentDeviceInfo.getPass()[0] != '\0')
+                    {
+                        return getSharedKeyNFC(uuidSharedKey);
+                    }
+                    return SharedKey();
+                }
+            }
+
+            _disconnect();
+
+            if(!doc.isNull()){
+                SharedKey sharedKey(uuidSharedKey, doc["sharedKey"].as<const char*>());
+
+                Serial.println(F("Este es el Shared Key solicitada"));
+                Serial.println(sharedKey.getSharedKey());
+
+                Serial.println(F("End requesting SharedKey"));
+                return sharedKey;
+            }
+        }
+    }
+
+    return SharedKey();
+}
+
 void CustomRequests::_disconnect()
 {
     #if TARGET_PLATFORM == 0
@@ -360,4 +433,80 @@ void CustomRequests::_disconnect()
 const DeviceInfo &CustomRequests::getCurrentDeviceInfo()
 {
     return _currentDeviceInfo;
+}
+
+bool CustomRequests::validateToken(const Card& card) {
+    Serial.println(F("Requesting validation"));
+
+    if (_currentDeviceInfo.getUserName() != nullptr && _currentDeviceInfo.getUserName()[0] != '\0' &&
+        _currentDeviceInfo.getPass() != nullptr && _currentDeviceInfo.getPass()[0] != '\0' &&
+        _currentDeviceInfo.getUuid() != nullptr && _currentDeviceInfo.getUuid()[0] != '\0' &&
+        card.getUuidCard() != nullptr && card.getUuidCard()[0] != '\0')
+    {
+        if (_connect())
+        {
+            JsonDocument docRequest;
+            docRequest["cardUuid"] = card.getUuidCard();
+            docRequest["tokensVersionUuid"] = card.getUuidToken();
+
+            const char * token = card.getToken();
+            double tokenLen = (double) strlen(token);
+            Serial.println(F("Token Len"));
+            Serial.println(tokenLen);
+            int fragments = (int) ceil(tokenLen / 254.0);
+            Serial.println(F("Fragmentos"));
+            Serial.println(fragments);
+            int countTokenChar = 0;
+            char tokenFragments[fragments][254];
+            for(int i = 0; i < fragments; i++){
+                for(int j = 0; j < 254; j++){
+                    if(j+(i*254) < tokenLen){
+                        tokenFragments[i][j] = token[countTokenChar];
+                        countTokenChar++;
+                    }
+                    else {
+                        tokenFragments[i][j] = '\0';
+                    }
+                }
+                Serial.println(F("Fragmento del token"));
+                Serial.println(tokenFragments[i]);
+                docRequest["jwtCard"].add(tokenFragments[i]);
+
+            }
+            
+            Serial.println(F("Validando que si se este serializando"));
+            serializeJsonPretty(docRequest, Serial);
+            Serial.println();
+            _prepareQuery("POST", "/api/cards/validate", "application/json", true, _currentDeviceInfo.getToken(), docRequest);
+
+            Serial.println(F("Solicitud enviada"));
+
+            JsonDocument doc = _parseJson();
+
+            if (doc["error"].is<JsonObject>())
+            {
+                JsonObject errorObj = doc["error"];
+                int status = errorObj["status"];
+                if (status == 401)
+                {
+                    Serial.println(F("Error de autorización"));
+                    _authNFC();
+                    if (_currentDeviceInfo.getUserName() != nullptr && _currentDeviceInfo.getUserName()[0] != '\0' &&
+                        _currentDeviceInfo.getPass() != nullptr && _currentDeviceInfo.getPass()[0] != '\0')
+                    {
+                        return validateToken(card);
+                    }
+                    return false;
+                }
+            }
+
+            _disconnect();
+
+            int status = doc["status"].as<int>();
+
+            return status == 204;
+        }
+    }
+
+    return false;
 }

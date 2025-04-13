@@ -18,17 +18,17 @@ void ReaderWriter::initPN532(){
     _nfc.SAMConfig();
 }
 
-int ReaderWriter::writeBlock(int block, uint8_t* dataBytes, uint8_t* uid, uint8_t uidLength) {
+int ReaderWriter::writeBlock(int block, uint8_t* dataBytes) {
 
     // Intentamos autenticar usando la clave A
-    if (_nfc.mifareclassic_AuthenticateBlock(uid, uidLength, block, 1, _key)) {
-      Serial.println(F("Autenticación exitosa."));
+    if (_nfc.mifareclassic_AuthenticateBlock(_uid, _uidLength, block, 1, _key)) {
+      //Serial.println(F("Autenticación exitosa."));
   
       // Escribir datos en el bloque
       if (_nfc.mifareclassic_WriteDataBlock(block, dataBytes)) {
-        Serial.println(F("Datos escritos correctamente."));
+        //Serial.println(F("Datos escritos correctamente."));
       } else {
-        Serial.println(F("Error al escribir en el bloque."));
+        //Serial.println(F("Error al escribir en el bloque."));
         return 1;
       }
     } else {
@@ -39,20 +39,20 @@ int ReaderWriter::writeBlock(int block, uint8_t* dataBytes, uint8_t* uid, uint8_
     return 0;
   }
   
-  uint8_t * ReaderWriter::readBlock(int block, uint8_t * uid, uint8_t uidLength) {
+  uint8_t * ReaderWriter::readBlock(int block) {
     static uint8_t data[16];
   
-    if (_nfc.mifareclassic_AuthenticateBlock(uid, uidLength, block, 1, _key)) {
-      Serial.println(F("Autenticación exitosa."));
+    if (_nfc.mifareclassic_AuthenticateBlock(_uid, _uidLength, block, 1, _key)) {
+      //Serial.println(F("Autenticación exitosa."));
   
       int success = _nfc.mifareclassic_ReadDataBlock(block, data);  // Leer Bloque 1
       if (success) {
-        Serial.println(F("Datos leídos del Bloque :"));
+        //Serial.println(F("Datos leídos del Bloque :"));
         //Serial.println(data);
   
       } else {
-        Serial.print(F("Error al leer el Bloque: "));
-        Serial.println(block);
+        //Serial.print(F("Error al leer el Bloque: "));
+        //Serial.println(block);
       }
     } else {
       //Serial.println("Error de autenticación.");
@@ -63,10 +63,8 @@ int ReaderWriter::writeBlock(int block, uint8_t* dataBytes, uint8_t* uid, uint8_
   }
   
   int ReaderWriter::_writeUuidGeneric(const char * uuid, int sector) {
-    uint8_t uid[] = { 0, 0, 0, 0, 0, 0, 0 };
-    uint8_t uidLength;
 
-    if (_nfc.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, &uidLength)) {
+    if (_isPresent) {
 
       uint8_t data[16];
 
@@ -74,7 +72,17 @@ int ReaderWriter::writeBlock(int block, uint8_t* dataBytes, uint8_t* uid, uint8_
         for(int j = 0; j < 16; j++){
           data[j] = (uint8_t) uuid[j+16*i];
         }
-        if(writeBlock(i+(sector*4), data, uid, uidLength) == 1){
+        
+        int block = 0;
+        
+        if(sector == 0) 
+          block = i+1;
+        else
+          block = i+(sector*4);
+          
+        //Serial.println("Escribiendo en el bloque");
+        //Serial.println(block);
+        if(writeBlock(block, data) == 1){
           return 1;
         }
       }
@@ -83,6 +91,38 @@ int ReaderWriter::writeBlock(int block, uint8_t* dataBytes, uint8_t* uid, uint8_
     }
     else
       return 3;
+  }
+
+  void ReaderWriter::_readUuidGeneric(int sector, char * buffer){
+
+    if (_isPresent) {
+
+      for(int i = 0; i < 2; i++){
+        uint8_t * data = NULL;
+        if(sector == 0) 
+          data = readBlock(i+1);
+        else
+          data = readBlock(i+(sector*4));
+        for(int j = 0; j < 16; j++){
+          buffer[j+16*i] = (char) data[j];
+        }
+      }
+      
+    }
+    Serial.println("Generic UUID");
+    Serial.println(buffer);
+  }
+
+  void ReaderWriter::readUuidCard(char * buffer){ // Cambiar bloque de escritura
+    return _readUuidGeneric(SECTOR_UUID_CARD, buffer);
+  }
+
+  void ReaderWriter::readUuidTokensVersion(char * buffer){
+    return _readUuidGeneric(SECTOR_UUID_TOKENS_VERSION, buffer);
+  }
+
+  void ReaderWriter::readUuidSharedKey(char * buffer){
+    return _readUuidGeneric(SECTOR_UUID_SHARED_KEY, buffer);
   }
 
   int ReaderWriter::writeUuidCard(const char * uuidCard){
@@ -99,10 +139,7 @@ int ReaderWriter::writeBlock(int block, uint8_t* dataBytes, uint8_t* uid, uint8_
 
   int ReaderWriter::writeToken(uint8_t * token, size_t lengthToken) {
   
-    uint8_t uid[] = { 0, 0, 0, 0, 0, 0, 0 };
-    uint8_t uidLength;
-  
-    if (_nfc.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, &uidLength)) {
+    if (_isPresent) {
   
       int idxChar = 0;
   
@@ -124,7 +161,7 @@ int ReaderWriter::writeBlock(int block, uint8_t* dataBytes, uint8_t* uid, uint8_
       data[0] = (lengthToken >> 8) & 0xFF;  // Primer byte
       data[1] = lengthToken & 0xFF;
   
-      int lenWriting = writeBlock(2, data, uid, uidLength);
+      int lenWriting = writeBlock(6, data);
   
       if (lenWriting == 0) {
         Serial.println("Se escribio longitud");
@@ -167,7 +204,7 @@ int ReaderWriter::writeBlock(int block, uint8_t* dataBytes, uint8_t* uid, uint8_
               }
             }
             //Serial.println("");
-            int resultWriteBlock = writeBlock(block, dataBytes, uid, uidLength);
+            int resultWriteBlock = writeBlock(block, dataBytes);
             if (resultWriteBlock != 0) {
               return resultWriteBlock;
             }
@@ -180,23 +217,18 @@ int ReaderWriter::writeBlock(int block, uint8_t* dataBytes, uint8_t* uid, uint8_
   }
   
   
-  void ReaderWriter::readToken(void) {
+  size_t ReaderWriter::readToken(uint8_t * buffer) {
     Serial.println("Acerque una tarjeta NFC para leer...");
   
-    uint8_t uid[] = { 0, 0, 0, 0, 0, 0, 0 };
-    uint8_t uidLength;
-  
     // Espera hasta que se detecte una tarjeta NFC
-    if (_nfc.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, &uidLength)) {
+    if (_isPresent) {
       //Serial.println("Etiqueta detectada!");
       
-      uint8_t * data = readBlock(1,uid, uidLength);
+      uint8_t * data = readBlock(6);
   
       int len =  (data[0] << 8) | data[1];
       //Serial.println("Esta es la longitud");
       //Serial.println(len);
-  
-      char *  mensaje = (char*) calloc(len, sizeof(char));
   
       int idxChar = 0;
   
@@ -206,28 +238,30 @@ int ReaderWriter::writeBlock(int block, uint8_t* dataBytes, uint8_t* uid, uint8_
       int blocksToRead = (int)ceil(len / 16.0);
       //Serial.println("Cantidad de bloques a leer");
       //Serial.println(blocksToRead);
-      int finalSector = (int)ceil(blocksToRead / 2.0);
-  
-      if (finalSector > FINAL_SECTOR) {
-        return;
+
+      int sectorsToRead = (int) ceil(blocksToRead / 3.0);
+      int finalSectorToRead = sectorsToRead +2;
+
+      if(finalSectorToRead > FINAL_SECTOR){
+        return (size_t) 0;
       }
   
       //Serial.println("Final sector");
       //Serial.println(finalSector);
   
-      int res = blocksToRead % 2;
+      int res = blocksToRead % 3;
       int finalBlock = 0;
       if (res == 0) {
-        finalBlock = finalSector * 4 + 1;
+        finalBlock = finalSectorToRead * 4 + 2;
       } else {
-        finalBlock = finalSector * 4;
+        finalBlock = (finalSectorToRead * 4 -1) + blocksToRead;
       }
   
       //Serial.println("Este es el bloque final");
       //Serial.println(finalBlock);
   
-      for (int sector = 1; sector <= finalSector; sector++) {
-        for (int idxBlock = 0; idxBlock < 2; idxBlock++) {
+      for (int sector = INIT_SECTOR_TOKEN; sector <= finalSectorToRead; sector++) {
+        for (int idxBlock = 0; idxBlock < 3; idxBlock++) {
   
           int block = sector * 4 + idxBlock;
   
@@ -236,12 +270,12 @@ int ReaderWriter::writeBlock(int block, uint8_t* dataBytes, uint8_t* uid, uint8_
             //Serial.println(block);
             
             //Serial.println("Leyendo mensaje");
-            data = readBlock(block,uid, uidLength);
+            data = readBlock(block);
   
             for (int j = 0; j < 16; j++) {
               if (idxChar < len) {
                 //Serial.print(mensaje[idxChar]);
-                mensaje[idxChar] = (char) data[j];  // Copia los caracteres
+                buffer[idxChar] = (char) data[j];  // Copia los caracteres
                 idxChar++;
               } 
             }
@@ -250,25 +284,20 @@ int ReaderWriter::writeBlock(int block, uint8_t* dataBytes, uint8_t* uid, uint8_
           }
         }
       }
-  
-      /*lcd.clear();
-      lcd.setCursor(0,0);
-      lcd.print("Mensaje:");
-      lcd.setCursor(0,1);
-      lcd.print(mensaje);*/
-      Serial.println("Mensaje");
-      Serial.println(mensaje);
+
+      return (size_t) len;
   
     }
+
+    return (size_t) 0;
 }
 
 bool ReaderWriter::detectCard() {
   Serial.println("Acerque una tarjeta NFC para leer...");
 
-  uint8_t uid[] = { 0, 0, 0, 0, 0, 0, 0 };
-  uint8_t uidLength;
+  _isPresent = _nfc.readPassiveTargetID(PN532_MIFARE_ISO14443A, _uid, &_uidLength, 500);
 
   // Espera hasta que se detecte una tarjeta NFC
-  return _nfc.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, &uidLength);
+  return _isPresent;
   
 }

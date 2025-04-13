@@ -168,7 +168,7 @@ void EncryptionNFC::encryptNFCData(const char *message)
     }
 }
 
-const char *EncryptionNFC::decryptNFCData()
+void EncryptionNFC::decryptNFCData(char * buffer)
 {
     // La función de descifrado no necesita cambios en este aspecto,
     // ya que trabaja con los datos cifrados que ya están en _encryptedMessage.
@@ -181,7 +181,6 @@ const char *EncryptionNFC::decryptNFCData()
         if (encryptedLength == 0)
         {
             Serial.println(F("Advertencia: No hay datos para descifrar."));
-            return nullptr;
         }
 
         AES128 aes128;
@@ -205,33 +204,32 @@ const char *EncryptionNFC::decryptNFCData()
                 Serial.print(F("Real Length: "));
                 Serial.println(realLength);
                 Serial.println(F("Convirtiendo"));
-                char result[realLength+1];
-                if (result == nullptr)
+                
+                if (buffer == nullptr)
                 {
                     Serial.println(F("Error al asignar memoria para el resultado del descifrado."));
-                    return nullptr;
+    
                 }
-                memcpy(result, decrypted, realLength);
-                result[realLength] = '\0';
-                Serial.println(result);
-                return result;
+                memcpy(buffer, decrypted, realLength);
+                buffer[realLength] = '\0';
+                Serial.println(buffer);
             }
             else
             {
                 Serial.println(F("Error: Padding PKCS7 inválido."));
-                return nullptr;
+
             }
         }
         else
         {
             Serial.println(F("Error durante el descifrado con AESLib."));
-            return nullptr;
+
         }
     }
     else
     {
         Serial.println(F("Error: Clave AES o IV no válidos (vacíos)."));
-        return nullptr;
+
     }
 }
 

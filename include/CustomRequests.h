@@ -37,7 +37,7 @@ private:
 
     const char * _HOST = "8080-idx-tt2-token-protection-1740550210828.cluster-wfwbjypkvnfkaqiqzlu3ikwjhe.cloudworkstations.dev";
     
-    DeviceInfo _currentDeviceInfo; // Información del dispositivo cargada
+    DeviceInfo &_currentDeviceInfo; // Información del dispositivo cargada
 
     // Métodos privados para uso interno
     JsonDocument _parseJson();
@@ -56,16 +56,16 @@ private:
 public:
     // Constructor - requiere una instancia de StoreData
     #if TARGET_PLATFORM == 0
-      CustomRequests(IPAddress arduinoIP, IPAddress proxyIP);
+      CustomRequests(IPAddress arduinoIP, IPAddress proxyIP, DeviceInfo &currentDeviceInfo);
     #else 
-      CustomRequests(const char * ssid, const char * pass);
+      CustomRequests(const char * ssid, const char * pass, DeviceInfo &currentDeviceInfo);
     #endif
 
     // Métodos públicos para realizar las acciones
     const char * registerCard();
     Card generateToken(Card& card);
-    //bool validateToken(const Card& card);
-    //SharedKey getSharedKeyNFC(const char * uuidSharedKey);
+    bool validateToken(const Card& card);
+    SharedKey getSharedKeyNFC(char * uuidSharedKey);
 
     // Getter para la información del dispositivo (opcional)
     const DeviceInfo& getCurrentDeviceInfo();

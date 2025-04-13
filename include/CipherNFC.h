@@ -53,7 +53,7 @@ class EncryptionNFC{
         void printHex(const char *label, const uint8_t *data, const size_t len);
         void encryptNFCData(const char * message);
         EncryptedMessage getEncryptedMessage();
-        const char * decryptNFCData();
+        void decryptNFCData(char * buffer);
 };
 
 #endif
