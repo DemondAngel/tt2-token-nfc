@@ -40,14 +40,20 @@
   const char * pass = (const char *) F("PASS");
 #endif
 
-#include <CustomRequests.h>
 #include <ReaderWriterNFC.h>
+
+void requestAndSaveNewToken(Card &card, CustomRequests &request);
+void decryptTokenCard(char * tokenDecrypted, CustomRequests &request);
 
 LiquidCrystal lcd(RS, EN, D4, D5, D6, D7); // Pin definition of the LCD
 
 Adafruit_PN532 nfc(SDA_PIN, SCL_PIN);
 
 ReaderWriter nfcReader(nfc);
+SharedKey sharedKey("", "");
+DeviceInfo currentDeviceInfo = DeviceInfo("nfc-reader", "demond", "1234567", "", sharedKey);
+
+
 
 void setup() {
   Serial.begin(115200);
@@ -83,11 +89,10 @@ void loop() {
       lcd.print(F("Registrando..."));
 
       #if TARGET_PLATFORM == 0
-        CustomRequests request(arduinoIp, proxyIp);
+        CustomRequests request(arduinoIp, proxyIp, currentDeviceInfo);
       #else
-        CustomRequests request("", "");
+        CustomRequests request("","", currentDeviceInfo);
       #endif
-      
       
       const char * uuidCard = request.registerCard();
       if (uuidCard != nullptr && uuidCard[0] != '\0') { // Comprobación para char * vacío
@@ -97,44 +102,7 @@ void loop() {
         Card card;
         card.setUuidCard(uuidCard);
 
-        card = request.generateToken(card);
-
-        if (card.getToken() != nullptr && card.getToken()[0] != '\0') { // Comprobación para char * vacío
-          Serial.println(F("UuidCard ya final"));
-          Serial.println(card.getUuidCard());
-
-          Serial.println(F("UuidToken ya final"));
-          Serial.println(card.getUuidToken());
-
-          Serial.println(F("Token final"));
-          Serial.println(card.getToken());
-          
-          KeysInformation keysInformation(request.getCurrentDeviceInfo().getSharedKey());
-          EncryptedMessage encryptedMessage;
-
-          EncryptionNFC encryptionNFC(keysInformation, encryptedMessage);
-
-          encryptionNFC.encryptNFCData(card.getToken());
-
-          if(nfcReader.writeUuidCard(card.getUuidCard()) == 0 && nfcReader.writeUuidTokensVersion(card.getUuidToken()) == 0
-            && nfcReader.writeUuidSharedKey(request.getCurrentDeviceInfo().getSharedKey().getUuidSharedKey()) == 0 && nfcReader.writeToken(encryptionNFC.getEncryptedMessage().getData(), encryptionNFC.getEncryptedMessage().getLen()) == 0){
-            Serial.println("Datos guardos");
-            lcd.clear();
-            lcd.setCursor(0,0);
-            lcd.print(F("Tarjeta"));
-            lcd.setCursor(0,1);
-            lcd.print(F("registrada"));    
-          }
-          
-        
-        } else {
-          Serial.println(F("Error en recuperar la tarjeta"));
-          lcd.clear();
-          lcd.setCursor(0, 0);
-          lcd.print(F("Error, verifica"));
-          lcd.setCursor(0, 1);
-          lcd.print(F("Conn y SD card"));
-        }
+        requestAndSaveNewToken(card, request);
         
       } else {
         Serial.println(F("Error registering card"));
@@ -148,12 +116,119 @@ void loop() {
     }
 
   } else {
+
     lcd.clear();
     lcd.setCursor(0, 0);
     lcd.print(F("Transaccion"));
     lcd.setCursor(0, 1);
     lcd.print(F("Acerque tarjeta"));
+    
+    if(nfcReader.detectCard()){
+      char uuidCard[33];
+      uuidCard[32] = '\0';
+      char uuidTokensVersion[33];
+      uuidTokensVersion[32] = '\0';
+
+      char tokenDecrypted[513];
+
+      for(int i = 0; i < 513; i++)
+        tokenDecrypted[i] = '\0';
+      
+      nfcReader.readUuidCard(uuidCard);
+      nfcReader.readUuidTokensVersion(uuidTokensVersion);
+
+      #if TARGET_PLATFORM == 0
+        CustomRequests request(arduinoIp, proxyIp, currentDeviceInfo);
+      #else
+        CustomRequests request("","", currentDeviceInfo);
+      #endif
+
+      Serial.println(F("ESte es el UUID card de la tarjeta leida"));
+      Serial.println(uuidCard);
+      Serial.println(F("Este es el uuid de la version del token"));
+      Serial.println(uuidTokensVersion);
+
+      decryptTokenCard(tokenDecrypted, request);
+
+      Serial.println(F("Este es el token descifrado de la tarjeta"));
+      Serial.println(tokenDecrypted);
+
+      Card card(uuidCard, uuidTokensVersion, tokenDecrypted);
+
+      bool status = request.validateToken(card);
+
+      if(status){
+        Serial.println(F("Tarjeta autorizada"));
+        delay(200);
+        requestAndSaveNewToken(card, request);
+      }
+      else{
+        Serial.println(F("No autorizado por cualquier razon"));
+      }
+
+    }
+    
   }
 
   delay(2000);
+}
+
+void requestAndSaveNewToken(Card &card, CustomRequests &request){
+  card = request.generateToken(card);
+
+  if (card.getToken() != nullptr && card.getToken()[0] != '\0') { // Comprobación para char * vacío
+    Serial.println(F("UuidCard ya final"));
+    Serial.println(card.getUuidCard());
+
+    Serial.println(F("UuidToken ya final"));
+    Serial.println(card.getUuidToken());
+
+    Serial.println(F("Token final"));
+    Serial.println(card.getToken());
+    
+    KeysInformation keysInformation(request.getCurrentDeviceInfo().getSharedKey());
+    EncryptedMessage encryptedMessage;
+
+    EncryptionNFC encryptionNFC(keysInformation, encryptedMessage);
+
+    encryptionNFC.encryptNFCData(card.getToken());
+
+    if(nfcReader.writeUuidCard(card.getUuidCard()) == 0 && nfcReader.writeUuidTokensVersion(card.getUuidToken()) == 0
+      && nfcReader.writeUuidSharedKey(request.getCurrentDeviceInfo().getSharedKey().getUuidSharedKey()) == 0 && nfcReader.writeToken(encryptionNFC.getEncryptedMessage().getData(), encryptionNFC.getEncryptedMessage().getLen()) == 0){
+      Serial.println("Datos guardos");
+      lcd.clear();
+      lcd.setCursor(0,0);
+      lcd.print(F("Tarjeta"));
+      lcd.setCursor(0,1);
+      lcd.print(F("registrada"));    
+    }
+    
+  
+  } else {
+    Serial.println(F("Error en recuperar la tarjeta"));
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print(F("Error, verifica"));
+    lcd.setCursor(0, 1);
+    lcd.print(F("Conn y SD card"));
+  }
+}
+
+void decryptTokenCard(char * tokenDecrypted, CustomRequests &request){
+
+  uint8_t token[513];
+  size_t len;
+  token[512] = (uint8_t)'\0';
+  len = nfcReader.readToken(token);
+  char uuidSharedKey[33];
+  uuidSharedKey[32] = '\0';
+  nfcReader.readUuidSharedKey(uuidSharedKey);
+
+  SharedKey sharedKey = request.getSharedKeyNFC(uuidSharedKey);
+
+  KeysInformation keysInformation(sharedKey);
+  EncryptedMessage encryptedMessage(token, len);
+  EncryptionNFC encryptionNFC(keysInformation, encryptedMessage);
+
+  encryptionNFC.decryptNFCData(tokenDecrypted);
 }
