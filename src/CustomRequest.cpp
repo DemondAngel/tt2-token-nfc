@@ -40,11 +40,13 @@
 
     bool CustomRequests::_connectToWiFi() {
         int count = 0;
-        const int retries = 10;
+        const int retries = 100;
         if(WiFi.status() != WL_CONNECTED){
             WiFi.begin(_ssid, _pass);
             Serial.println(F("Conectando a"));
             Serial.println(_ssid);
+            Serial.println("Password");
+            Serial.println(_pass);
 
             while (WiFi.status() != WL_CONNECTED && count <= retries) {
                 delay(200);
@@ -73,29 +75,32 @@ bool CustomRequests::_connect(){
 }
 
 JsonDocument CustomRequests::_parseJson()
-{
+{   
+    JsonDocument doc;
     #if TARGET_PLATFORM == 0
         char status[32] = {0};
         _client.readBytesUntil('\r', status, sizeof(status));
-
+        Serial.println(F("Este es el status"));
+        Serial.println(status + 9);
         if (strcmp(status + 9, "200 OK") == 0 || strcmp(status + 9, "204 No Content") == 0 || strcmp(status + 9, "401 Unauthorized") == 0)
         {
             if (!_client.find("\r\n\r\n"))
             {
                 Serial.println(F("Invalid response"));
                 _client.stop();
-                return JsonDocument();
+                return doc;
             }
-
-            JsonDocument doc;
+            
             DeserializationError error = deserializeJson(doc, _client);
             if (error)
             {
                 Serial.print(F("deserializeJson() failed: "));
                 Serial.println(error.f_str());
                 _client.stop();
-                return JsonDocument();
+                return doc;
             }
+            Serial.println("Respuesta obtenida");
+            serializeJson(doc, Serial);
             return doc;
         }
         else
@@ -103,7 +108,7 @@ JsonDocument CustomRequests::_parseJson()
             Serial.print(F("Unexpected response: "));
             Serial.println(status);
             _client.stop();
-            return JsonDocument();
+            return doc;
         }
     #else
         if (_httpCode > 0) {
@@ -115,14 +120,13 @@ JsonDocument CustomRequests::_parseJson()
             Serial.println(responsePayload);
         
             // Parsear el JSON de la respuesta
-            JsonDocument doc; // Ajusta el tamaño según la respuesta esperada
             DeserializationError error = deserializeJson(doc, responsePayload);
         
             if (error) {
                 Serial.print(F("deserializeJson() failed: "));
                 Serial.println(error.f_str());
                 _http.end();
-                return JsonDocument();
+                return doc;
             }
             return doc;
 
@@ -134,13 +138,16 @@ JsonDocument CustomRequests::_parseJson()
       } else {
         Serial.printf("[HTTP] POST... failed, error: %s\n", _http.errorToString(_httpCode).c_str());
         _http.end();
-        return JsonDocument();
+        return doc;
       }
     #endif
 }
 
 void CustomRequests::_prepareQuery(const char * method, const char * uri, const char * contentType, bool auth, const char * token, const JsonDocument &docRequest)
-{
+{   
+    Serial.println(F("Validando que si se este serializando"));
+    serializeJsonPretty(docRequest, Serial);
+    Serial.println();
     #if TARGET_PLATFORM == 0
         _client.print(method);
         _client.print(F(" "));
@@ -177,11 +184,15 @@ void CustomRequests::_prepareQuery(const char * method, const char * uri, const 
 
         
     #else
-        _http.begin(String(_HOST)+String(uri));
-
+        _http.begin(String("https://") + String(_HOST)+String(uri));
+        _http.addHeader(F("Cache-Control"), F("no-cache, no-store, must-revalidate"));
+        if (auth)
+        {
+            _http.addHeader(F("Authorization"), String(F("Bearer ")) + String(token));
+        }
         if(strcmp(method, "POST") == 0){
             _http.addHeader(F("Content-Type"), contentType);
-            _http.addHeader(F("Cache-Control"), F("no-cache, no-store, must-revalidate"));
+            
             String json;
             serializeJsonPretty(docRequest, json);
             _httpCode = _http.POST(json);
@@ -194,7 +205,7 @@ void CustomRequests::_prepareQuery(const char * method, const char * uri, const 
 
 }
 
-const char *CustomRequests::registerCard()
+void CustomRequests::registerCard(char * buffer)
 {
 
     Serial.println(F("Requesting card uuid"));
@@ -212,9 +223,12 @@ const char *CustomRequests::registerCard()
             Serial.println(F("Solicitud enviada"));
 
             JsonDocument doc = _parseJson();
+            Serial.println("Doc recuperado");
+            serializeJsonPretty(doc, Serial);
             _disconnect();
             if (doc["error"].is<JsonObject>())
             {
+                
                 JsonObject errorObj = doc["error"];
                 int status = errorObj["status"];
                 if (status == 401)
@@ -224,19 +238,19 @@ const char *CustomRequests::registerCard()
                     if (_currentDeviceInfo.getUserName() != nullptr && _currentDeviceInfo.getUserName()[0] != '\0' &&
                         _currentDeviceInfo.getPass() != nullptr && _currentDeviceInfo.getPass()[0] != '\0')
                     {
-                        return registerCard();
+                        registerCard(buffer);
                     }
-                    return "";
                 }
-                return "";
             }
 
-            const char *uuidCard = const_cast<char *>(doc["card"]["uuid"].as<const char *>());
+            const char * uuidCard = const_cast<char *>(doc["card"]["uuid"].as<const char *>());
+            strcpy(buffer, uuidCard);
+            Serial.println("Este es uuid de la tarjeta");
+            Serial.println(buffer);
             Serial.println(F("End requesting card uuid"));
-            return uuidCard;
         }
     }
-    return "";
+    
 }
 
 void CustomRequests::_authNFC()
@@ -257,7 +271,9 @@ void CustomRequests::_authNFC()
 
         if (!doc.isNull())
         {
-            SharedKey sharedKey(doc["sharedKeyUuid"].as<const char *>(), doc["sharedKey"].as<const char *>());
+            SharedKey sharedKey = _currentDeviceInfo.getSharedKey();
+            sharedKey.setUuidSharedKey(doc["sharedKeyUuid"].as<const char *>());
+            sharedKey.setSharedKey(doc["sharedKey"].as<const char *>());
             _currentDeviceInfo.setSharedKey(sharedKey);
             _currentDeviceInfo.setPass(_currentDeviceInfo.getPass());
             _currentDeviceInfo.setUserName(_currentDeviceInfo.getUserName());
@@ -278,7 +294,7 @@ void CustomRequests::_authNFC()
     }
 }
 
-Card CustomRequests::generateToken(Card &card)
+void CustomRequests::generateToken(Card &card)
 {
     Serial.println(F("Requesting token"));
 
@@ -297,7 +313,7 @@ Card CustomRequests::generateToken(Card &card)
             Serial.println(F("Solicitud enviada"));
 
             JsonDocument doc = _parseJson();
-
+            _disconnect();
             if (doc["error"].is<JsonObject>())
             {
                 JsonObject errorObj = doc["error"];
@@ -309,16 +325,13 @@ Card CustomRequests::generateToken(Card &card)
                     if (_currentDeviceInfo.getUserName() != nullptr && _currentDeviceInfo.getUserName()[0] != '\0' &&
                         _currentDeviceInfo.getPass() != nullptr && _currentDeviceInfo.getPass()[0] != '\0')
                     {
-                        return generateToken(card);
+                        generateToken(card);
                     }
-                    return Card("", "", "");
                 }
             }
 
-            _disconnect();
-
             JsonArray tokenArray = doc["token"].as<JsonArray>();
-            char token[513] = ""; // Buffer para almacenar el token (tamaño 512)
+            char * token = card.getToken(); // Buffer para almacenar el token (tamaño 512)
             int tokenIndex = 0;   // Índice para llevar el seguimiento de la posición en el buffer
 
             Serial.println(F("TokenJson"));
@@ -328,21 +341,25 @@ Card CustomRequests::generateToken(Card &card)
                 Serial.println(tokenAux);
 
                 // Asegúrate de no desbordar el buffer
-                if (tokenIndex + strlen(tokenAux) < sizeof(token) - 1)
+                Serial.println("Disponibilidad para el token");
+                Serial.println(sizeof(token) - 1);
+                if (tokenIndex + strlen(tokenAux) < CARD_TOKEN_LENGTH)
                 {
                     strcpy(token + tokenIndex, tokenAux); // Copia la cadena al buffer
                     tokenIndex += strlen(tokenAux);       // Actualiza el índice
                 }
                 else
                 {
+                    
                     Serial.println(F("¡Advertencia! El token excede el tamaño del buffer."));
+                    Serial.println(tokenIndex + strlen(tokenAux));
                     // Puedes implementar un manejo de error aquí si es necesario
                     break; // Detener la concatenación para evitar desbordamiento
                 }
             }
             token[tokenIndex] = '\0';
 
-            char *uuidTokensVersion = const_cast<char *>(doc["tokensVersionUuid"].as<const char *>());
+            char * uuidTokensVersion = const_cast<char *>(doc["tokensVersionUuid"].as<const char *>());
 
             Serial.println(F("TokensVersionUuid"));
             Serial.println(uuidTokensVersion);
@@ -351,13 +368,12 @@ Card CustomRequests::generateToken(Card &card)
             card.setToken(token);
 
             Serial.println(F("Si construye la tarjeta"));
-            return card;
         }
     }
-    return Card("", "", "");
+
 }
 
-SharedKey CustomRequests::getSharedKeyNFC(char * uuidSharedKey){
+void CustomRequests::getSharedKeyNFC(SharedKey & sharedKey){
     Serial.println(F("Requesting key"));
 
     if (_currentDeviceInfo.getUserName() != nullptr && _currentDeviceInfo.getUserName()[0] != '\0' &&
@@ -373,7 +389,7 @@ SharedKey CustomRequests::getSharedKeyNFC(char * uuidSharedKey){
                 uri[i] = '\0';
 
             strcpy(uri, "/api/shared-keys/");
-            char * url = strcat(uri, uuidSharedKey);
+            char * url = strcat(uri, sharedKey.getUuidSharedKey());
             url[49] = '\0';
             Serial.println(F("Este es el uri del sharedKey"));
             Serial.println(url);
@@ -383,7 +399,7 @@ SharedKey CustomRequests::getSharedKeyNFC(char * uuidSharedKey){
             Serial.println("Solicutd enviada");
 
             JsonDocument doc = _parseJson();
-
+            _disconnect();
             if (doc["error"].is<JsonObject>())
             {
                 JsonObject errorObj = doc["error"];
@@ -395,27 +411,24 @@ SharedKey CustomRequests::getSharedKeyNFC(char * uuidSharedKey){
                     if (_currentDeviceInfo.getUserName() != nullptr && _currentDeviceInfo.getUserName()[0] != '\0' &&
                         _currentDeviceInfo.getPass() != nullptr && _currentDeviceInfo.getPass()[0] != '\0')
                     {
-                        return getSharedKeyNFC(uuidSharedKey);
+                        getSharedKeyNFC(sharedKey);
+                        return;
                     }
-                    return SharedKey();
+
                 }
             }
 
-            _disconnect();
-
             if(!doc.isNull()){
-                SharedKey sharedKey(uuidSharedKey, doc["sharedKey"].as<const char*>());
 
+                sharedKey.setSharedKey(doc["sharedKey"].as<const char*>());
                 Serial.println(F("Este es el Shared Key solicitada"));
                 Serial.println(sharedKey.getSharedKey());
 
                 Serial.println(F("End requesting SharedKey"));
-                return sharedKey;
             }
         }
     }
 
-    return SharedKey();
 }
 
 void CustomRequests::_disconnect()
@@ -430,12 +443,12 @@ void CustomRequests::_disconnect()
     
 }
 
-const DeviceInfo &CustomRequests::getCurrentDeviceInfo()
+DeviceInfo &CustomRequests::getCurrentDeviceInfo()
 {
     return _currentDeviceInfo;
 }
 
-bool CustomRequests::validateToken(const Card& card) {
+bool CustomRequests::validateToken(Card& card) {
     Serial.println(F("Requesting validation"));
 
     if (_currentDeviceInfo.getUserName() != nullptr && _currentDeviceInfo.getUserName()[0] != '\0' &&
@@ -449,18 +462,18 @@ bool CustomRequests::validateToken(const Card& card) {
             docRequest["cardUuid"] = card.getUuidCard();
             docRequest["tokensVersionUuid"] = card.getUuidToken();
 
-            const char * token = card.getToken();
+            char * token = card.getToken();
             double tokenLen = (double) strlen(token);
             Serial.println(F("Token Len"));
             Serial.println(tokenLen);
-            int fragments = (int) ceil(tokenLen / 254.0);
+            int fragments = (int) ceil(tokenLen / 255.0);
             Serial.println(F("Fragmentos"));
             Serial.println(fragments);
             int countTokenChar = 0;
-            char tokenFragments[fragments][254];
+            char tokenFragments[fragments][255];
             for(int i = 0; i < fragments; i++){
-                for(int j = 0; j < 254; j++){
-                    if(j+(i*254) < tokenLen){
+                for(int j = 0; j < 255; j++){
+                    if(j+(i*255) < tokenLen){
                         tokenFragments[i][j] = token[countTokenChar];
                         countTokenChar++;
                     }
@@ -474,15 +487,13 @@ bool CustomRequests::validateToken(const Card& card) {
 
             }
             
-            Serial.println(F("Validando que si se este serializando"));
-            serializeJsonPretty(docRequest, Serial);
-            Serial.println();
+            
             _prepareQuery("POST", "/api/cards/validate", "application/json", true, _currentDeviceInfo.getToken(), docRequest);
 
             Serial.println(F("Solicitud enviada"));
 
             JsonDocument doc = _parseJson();
-
+            _disconnect();
             if (doc["error"].is<JsonObject>())
             {
                 JsonObject errorObj = doc["error"];
@@ -499,8 +510,6 @@ bool CustomRequests::validateToken(const Card& card) {
                     return false;
                 }
             }
-
-            _disconnect();
 
             int status = doc["status"].as<int>();
 

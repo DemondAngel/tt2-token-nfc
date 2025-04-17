@@ -9,7 +9,7 @@ Card::Card() {
 }
 
 Card::Card(const char* uuidCard, const char* uuidToken, const char* token) {
-    setUuidCard(uuidCard);
+    setUuidCard(uuidCard); 
     setUuidToken(uuidToken);
     setToken(token);
 }
@@ -23,7 +23,7 @@ void Card::setUuidCard(const char* uuidCard) {
     }
 }
 
-const char* Card::getUuidCard() const {
+char* Card::getUuidCard(){
     return _uuidCard;
 }
 
@@ -36,7 +36,7 @@ void Card::setUuidToken(const char* uuidToken) {
     }
 }
 
-const char* Card::getUuidToken() const {
+char* Card::getUuidToken() {
     return _uuidToken;
 }
 
@@ -61,6 +61,6 @@ bool Card::setToken(const char* token) {
     }
 }
 
-const char* Card::getToken() const {
+char* Card::getToken() {
     return _token;
 }

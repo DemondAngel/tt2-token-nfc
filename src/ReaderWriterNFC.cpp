@@ -5,7 +5,7 @@
 ReaderWriter::ReaderWriter(Adafruit_PN532 nfc): _nfc(nfc) {}
 
 void ReaderWriter::initPN532(){
-    Wire.begin();
+    Wire.begin(SDA_PIN, SCL_PIN, 100000);
     _nfc.begin();
 
     uint32_t versiondata = _nfc.getFirmwareVersion();
@@ -218,7 +218,6 @@ int ReaderWriter::writeBlock(int block, uint8_t* dataBytes) {
   
   
   size_t ReaderWriter::readToken(uint8_t * buffer) {
-    Serial.println("Acerque una tarjeta NFC para leer...");
   
     // Espera hasta que se detecte una tarjeta NFC
     if (_isPresent) {
@@ -284,6 +283,8 @@ int ReaderWriter::writeBlock(int block, uint8_t* dataBytes) {
           }
         }
       }
+
+      Serial.println("Termino de leer el token");
 
       return (size_t) len;
   

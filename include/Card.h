@@ -19,13 +19,13 @@ public:
     Card(const char* uuidCard, const char* uuidToken, const char* token);
 
     void setUuidCard(const char* uuidCard);
-    const char* getUuidCard() const;
+    char* getUuidCard();
 
     void setUuidToken(const char* uuidToken);
-    const char* getUuidToken() const;
+    char* getUuidToken();
 
     bool setToken(const char* token); // El setter ahora devuelve un bool para indicar éxito/fracaso
-    const char* getToken() const;
+    char* getToken();
 };
 
 #endif
