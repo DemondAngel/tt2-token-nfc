@@ -20,7 +20,7 @@ class DeviceInfo {
     public:
         // Constructor
         DeviceInfo();
-        DeviceInfo(const char* uuid, const char* userName, const char* pass, const char* token, const SharedKey& sharedKey);
+        DeviceInfo(const char* uuid, const char* userName, const char* pass, const char* token,SharedKey& sharedKey);
 
         // Destructor (SharedKey no gestiona memoria dinámica en la versión estática)
         ~DeviceInfo() = default;
@@ -43,7 +43,7 @@ class DeviceInfo {
 
         // Setter y Getter para SharedKey (se pasa y almacena por valor)
         void setSharedKey(const SharedKey& sharedKey);
-        SharedKey getSharedKey() const;
+        SharedKey & getSharedKey();
 
         String toString() const;
 };

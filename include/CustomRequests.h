@@ -62,13 +62,13 @@ public:
     #endif
 
     // Métodos públicos para realizar las acciones
-    const char * registerCard();
-    Card generateToken(Card& card);
-    bool validateToken(const Card& card);
-    SharedKey getSharedKeyNFC(char * uuidSharedKey);
+    void registerCard(char * buffer);
+    void generateToken(Card& card);
+    bool validateToken(Card& card);
+    void getSharedKeyNFC(SharedKey & sharedKey);
 
     // Getter para la información del dispositivo (opcional)
-    const DeviceInfo& getCurrentDeviceInfo();
+    DeviceInfo& getCurrentDeviceInfo();
 };
 
 #endif

@@ -9,7 +9,7 @@ DeviceInfo::DeviceInfo() {
 }
 
 // Constructor
-DeviceInfo::DeviceInfo(const char* uuid, const char* userName, const char* pass, const char* token, const SharedKey& sharedKey)
+DeviceInfo::DeviceInfo(const char* uuid, const char* userName, const char* pass, const char* token, SharedKey& sharedKey)
     : _sharedKey(sharedKey) {
     strncpy(_uuid, uuid, UUID_LENGTH - 1);
     _uuid[UUID_LENGTH - 1] = '\0';
@@ -78,7 +78,7 @@ void DeviceInfo::setSharedKey(const SharedKey& sharedKey) {
 }
 
 // Getter para SharedKey
-SharedKey DeviceInfo::getSharedKey() const {
+SharedKey & DeviceInfo::getSharedKey() {
     return _sharedKey; // Devuelve una copia del objeto SharedKey
 }
 
