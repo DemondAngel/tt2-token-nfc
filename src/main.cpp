@@ -96,9 +96,11 @@ void loop() {
       #endif
       Card card;
       char * buffer = card.getUuidCard();
+      Serial.println("Dirección del memoria de uuidCard");
+            Serial.println((uint32_t)&buffer, HEX);
       request.registerCard(buffer);
       Serial.println(F("Esta es el uuId nuevo de la tarjeta"));
-      Serial.println(buffer);
+      Serial.println(card.getUuidCard());
       
       if (card.getUuidCard() != nullptr && card.getUuidCard()[0] != '\0') { // Comprobación para char * vacío
         

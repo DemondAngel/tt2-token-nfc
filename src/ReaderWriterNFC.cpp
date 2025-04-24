@@ -5,7 +5,11 @@
 ReaderWriter::ReaderWriter(Adafruit_PN532 nfc): _nfc(nfc) {}
 
 void ReaderWriter::initPN532(){
+
+  #if TARGET_PLATFORM == 1
     Wire.begin(SDA_PIN, SCL_PIN, 100000);
+  #endif
+
     _nfc.begin();
 
     uint32_t versiondata = _nfc.getFirmwareVersion();
