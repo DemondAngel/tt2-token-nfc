@@ -239,12 +239,15 @@ void CustomRequests::registerCard(char * buffer)
                         _currentDeviceInfo.getPass() != nullptr && _currentDeviceInfo.getPass()[0] != '\0')
                     {
                         registerCard(buffer);
+                        return;
                     }
                 }
             }
 
-            const char * uuidCard = const_cast<char *>(doc["card"]["uuid"].as<const char *>());
-            strcpy(buffer, uuidCard);
+            const char * uuidCard = doc["card"]["uuid"].as<const char *>();
+            strncpy(buffer, uuidCard, 33);
+            Serial.println("Dirección del memoria de buffer");
+            Serial.println((uint32_t)&buffer, HEX);
             Serial.println("Este es uuid de la tarjeta");
             Serial.println(buffer);
             Serial.println(F("End requesting card uuid"));
@@ -326,6 +329,7 @@ void CustomRequests::generateToken(Card &card)
                         _currentDeviceInfo.getPass() != nullptr && _currentDeviceInfo.getPass()[0] != '\0')
                     {
                         generateToken(card);
+                        return;
                     }
                 }
             }
