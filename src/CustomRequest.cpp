@@ -454,6 +454,7 @@ DeviceInfo &CustomRequests::getCurrentDeviceInfo()
 
 bool CustomRequests::validateToken(Card& card) {
     Serial.println(F("Requesting validation"));
+    const int chunkSize = 254;
 
     if (_currentDeviceInfo.getUserName() != nullptr && _currentDeviceInfo.getUserName()[0] != '\0' &&
         _currentDeviceInfo.getPass() != nullptr && _currentDeviceInfo.getPass()[0] != '\0' &&
@@ -470,19 +471,23 @@ bool CustomRequests::validateToken(Card& card) {
             double tokenLen = (double) strlen(token);
             Serial.println(F("Token Len"));
             Serial.println(tokenLen);
-            int fragments = (int) ceil(tokenLen / 255.0);
+            int fragments = (int) ceil(tokenLen / 254.0);
             Serial.println(F("Fragmentos"));
             Serial.println(fragments);
             int countTokenChar = 0;
-            char tokenFragments[fragments][255];
+            char tokenFragments[fragments][chunkSize];
+
+            for (int i = 0; i < fragments; i++) {
+                for (int j = 0; j < chunkSize; j++) {
+                  tokenFragments[i][j] = '\0';
+                }
+              }
+
             for(int i = 0; i < fragments; i++){
-                for(int j = 0; j < 255; j++){
-                    if(j+(i*255) < tokenLen){
+                for(int j = 0; j < chunkSize; j++){
+                    if(j+(i*chunkSize) < tokenLen){
                         tokenFragments[i][j] = token[countTokenChar];
                         countTokenChar++;
-                    }
-                    else {
-                        tokenFragments[i][j] = '\0';
                     }
                 }
                 Serial.println(F("Fragmento del token"));
