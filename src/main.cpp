@@ -42,7 +42,7 @@
 
 #include <ReaderWriterNFC.h>
 
-void requestAndSaveNewToken(Card &card, CustomRequests &request);
+void saveNewToken(Card &card, CustomRequests &request);
 void decryptTokenCard(char * tokenDecrypted, CustomRequests &request);
 
 LiquidCrystal lcd(RS, EN, D4, D5, D6, D7); // Pin definition of the LCD
@@ -95,17 +95,15 @@ void loop() {
         CustomRequests request(ssd,pass, currentDeviceInfo);
       #endif
       Card card;
-      char * buffer = card.getUuidCard();
-      Serial.println("Dirección del memoria de uuidCard");
-            Serial.println((uint32_t)&buffer, HEX);
-      request.registerCard(buffer);
+
+      request.registerCard(card);
       Serial.println(F("Esta es el uuId nuevo de la tarjeta"));
       Serial.println(card.getUuidCard());
       
       if (card.getUuidCard() != nullptr && card.getUuidCard()[0] != '\0') { // Comprobación para char * vacío
         
 
-        requestAndSaveNewToken(card, request);
+        saveNewToken(card, request);
         
       } else {
         Serial.println(F("Error registering card"));
@@ -163,7 +161,7 @@ void loop() {
       if(status){
         Serial.println(F("Tarjeta autorizada"));
         delay(200);
-        requestAndSaveNewToken(card, request);
+        saveNewToken(card, request);
       }
       else{
         Serial.println(F("No autorizado por cualquier razon"));
@@ -176,8 +174,8 @@ void loop() {
   delay(2000);
 }
 
-void requestAndSaveNewToken(Card &card, CustomRequests &request){
-  request.generateToken(card);
+void saveNewToken(Card &card, CustomRequests &request){
+  //request.generateToken(card);
 
   if (card.getToken() != nullptr && card.getToken()[0] != '\0') { // Comprobación para char * vacío
     Serial.println(F("UuidCard ya final"));
