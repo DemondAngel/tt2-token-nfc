@@ -1,0 +1,11 @@
+{
+    "status": 200,
+    "token": [
+        "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJjYXJkVXVpZCI6ImZkNzI3Y2M1ODA2ODQ4YjlhMGNiOGY1MjRjMzRjYjRlIiwidG9rZW5WZXJzaW9uVXVpZCI6IjkwNjYyMzJjNTMwYzRhYjQ5ZTU3ZjE2ZDgxM2QzNzRkIiwic2hhcmVkS2V5VXVpZCI6IjdmZmU1ODRiN2MzYjRiOGU5MDQxMTQwMTk4MDg0N2M0IiwiaWF0IjoxNzQ2Mz",
+        "A4Mjc2LCJleHAiOjE3Nzc4NDQyNzZ9.9fuqi0cvaRbEsDt46uCGFQXtdHk34cZUTEb3hZyKOXUn4cpbYgYjYosZkDyJZ1oDQwNZIEFygmgkPMJK3sregg"
+    ],
+    "tokensVersionUuid": "9066232c530c4ab49e57f16d813d374d",
+    "card": {
+        "uuid": "fd727cc5806848b9a0cb8f524c34cb4e"
+    }
+}
