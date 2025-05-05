@@ -62,8 +62,9 @@ public:
     #endif
 
     // Métodos públicos para realizar las acciones
-    void registerCard(char * buffer);
-    void generateToken(Card& card);
+    void registerCard(Card& card);
+    //void generateToken(Card& card);
+    void extractToken(JsonDocument & doc, Card & card);
     bool validateToken(Card& card);
     void getSharedKeyNFC(SharedKey & sharedKey);
 

@@ -205,7 +205,7 @@ void CustomRequests::_prepareQuery(const char * method, const char * uri, const 
 
 }
 
-void CustomRequests::registerCard(char * buffer)
+void CustomRequests::registerCard(Card & card)
 {
 
     Serial.println(F("Requesting card uuid"));
@@ -238,18 +238,19 @@ void CustomRequests::registerCard(char * buffer)
                     if (_currentDeviceInfo.getUserName() != nullptr && _currentDeviceInfo.getUserName()[0] != '\0' &&
                         _currentDeviceInfo.getPass() != nullptr && _currentDeviceInfo.getPass()[0] != '\0')
                     {
-                        registerCard(buffer);
+                        registerCard(card);
                         return;
                     }
                 }
             }
 
+            extractToken(doc, card);
+
             const char * uuidCard = doc["card"]["uuid"].as<const char *>();
-            strncpy(buffer, uuidCard, 33);
-            Serial.println("Dirección del memoria de buffer");
-            Serial.println((uint32_t)&buffer, HEX);
+            strncpy(card.getUuidCard(), uuidCard, 33);
+            
             Serial.println("Este es uuid de la tarjeta");
-            Serial.println(buffer);
+            Serial.println(card.getUuidCard());
             Serial.println(F("End requesting card uuid"));
         }
     }
@@ -296,7 +297,7 @@ void CustomRequests::_authNFC()
         }
     }
 }
-
+/*
 void CustomRequests::generateToken(Card &card)
 {
     Serial.println(F("Requesting token"));
@@ -375,6 +376,48 @@ void CustomRequests::generateToken(Card &card)
         }
     }
 
+}
+    */
+
+void CustomRequests::extractToken(JsonDocument & doc, Card & card) {
+
+    JsonArray tokenArray = doc["token"].as<JsonArray>();
+    char * token = card.getToken(); // Buffer para almacenar el token (tamaño 512)
+    int tokenIndex = 0;   // Índice para llevar el seguimiento de la posición en el buffer
+
+    Serial.println(F("TokenJson"));
+    for (JsonVariant v : tokenArray)
+    {
+        const char *tokenAux = v.as<const char *>(); // Obtén el valor como const char*
+        Serial.println(tokenAux);
+
+        // Asegúrate de no desbordar el buffer
+        Serial.println("Disponibilidad para el token");
+        Serial.println(sizeof(token) - 1);
+        if (tokenIndex + strlen(tokenAux) < CARD_TOKEN_LENGTH)
+        {
+            strcpy(token + tokenIndex, tokenAux); // Copia la cadena al buffer
+            tokenIndex += strlen(tokenAux);       // Actualiza el índice
+        }
+        else
+        {
+            
+            Serial.println(F("¡Advertencia! El token excede el tamaño del buffer."));
+            Serial.println(tokenIndex + strlen(tokenAux));
+            // Puedes implementar un manejo de error aquí si es necesario
+            break; // Detener la concatenación para evitar desbordamiento
+        }
+    }
+    token[tokenIndex] = '\0';
+
+    char * uuidTokensVersion = const_cast<char *>(doc["tokensVersionUuid"].as<const char *>());
+
+    Serial.println(F("TokensVersionUuid"));
+    Serial.println(uuidTokensVersion);
+
+    card.setUuidToken(uuidTokensVersion);
+    card.setToken(token);
+    
 }
 
 void CustomRequests::getSharedKeyNFC(SharedKey & sharedKey){
@@ -466,6 +509,7 @@ bool CustomRequests::validateToken(Card& card) {
             JsonDocument docRequest;
             docRequest["cardUuid"] = card.getUuidCard();
             docRequest["tokensVersionUuid"] = card.getUuidToken();
+            docRequest["nfcUuid"] = _currentDeviceInfo.getUuid();
 
             char * token = card.getToken();
             double tokenLen = (double) strlen(token);
@@ -521,8 +565,9 @@ bool CustomRequests::validateToken(Card& card) {
             }
 
             int status = doc["status"].as<int>();
+            extractToken(doc, card);
 
-            return status == 204;
+            return status == 200;
         }
     }
 
