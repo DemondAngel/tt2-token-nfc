@@ -1,3 +1,4 @@
+#include <Secrets.h>
 #include <LiquidCrystal.h>
 #include <Arduino.h>
 #include <string.h> // Necesario para strcmp
@@ -36,8 +37,6 @@
   #define D7 15
   #define COLS 16
   #define ROWS 2
-  const char * ssd = (const char *) F("");
-  const char * pass = (const char *) F("");
 #endif
 
 #include <ReaderWriterNFC.h>
@@ -52,18 +51,31 @@ Adafruit_PN532 nfc(SDA_PIN, SCL_PIN);
 ReaderWriter nfcReader(nfc);
 SharedKey sharedKey("", "");
 
-#if TARGET_PLATFORM == 0
-  DeviceInfo currentDeviceInfo = DeviceInfo("nfc-reader", "demond", "1234567", "", sharedKey);
-#else
-  DeviceInfo currentDeviceInfo = DeviceInfo("nfc-reader-2", "angel", "1234567", "", sharedKey);
-#endif
-
-
+DeviceInfo currentDeviceInfo = DeviceInfo(UUID, USER, PASS, "", sharedKey);
 
 void setup() {
   Serial.begin(115200);
 
   pinMode(REGISTER_PIN, INPUT);
+
+  pinMode(RST, OUTPUT);
+  digitalWrite(RST, HIGH);
+  delay(10);
+  Serial.println(F("RealizandoRST por hardware al PN532"));
+  digitalWrite(RST, LOW);
+  delay(20);
+  digitalWrite(RST, LOW);
+  delay(100);
+
+  #if TARGET_PLATFORM == 0
+    pinMode(w5500ResetPin, OUTPUT);
+    digitalWrite(w5500ResetPin, HIGH);
+    Serial.println("Realizando RESET por hardware al W5500...");
+    digitalWrite(w5500ResetPin, LOW);
+    delay(20);
+    digitalWrite(w5500ResetPin, HIGH);
+    delay(100);
+    #endif
 
   lcd.begin(COLS, ROWS);
   lcd.setCursor(0, 0);
@@ -76,110 +88,119 @@ void setup() {
   lcd.print(F("Leyendo info del"));
   lcd.setCursor(0, 1);
   lcd.print(F("lector NFC"));
+
 }
 
-void loop() {
+void loop()
+{
 
-  if (digitalRead(REGISTER_PIN) == HIGH) {
+  if (digitalRead(REGISTER_PIN) == HIGH)
+  {
     lcd.clear();
     lcd.setCursor(0, 0);
     lcd.print(F("Registro activo."));
     lcd.setCursor(0, 1);
     lcd.print(F("Acerca tarjeta."));
     Serial.println(F("Autenticando NFC"));
-    
-    if (nfcReader.detectCard()) {
-      delay(1000);
-      lcd.clear();
-      lcd.setCursor(0, 0);
-      lcd.print(F("Registrando..."));
-      Serial.println(F("Registrando"));
-      #if TARGET_PLATFORM == 0
-        CustomRequests request(arduinoIp, proxyIp, currentDeviceInfo);
-      #else
-        CustomRequests request(ssd,pass, currentDeviceInfo);
-      #endif
-      Card card;
 
-      request.registerCard(card);
-      Serial.println(F("Esta es el uuId nuevo de la tarjeta"));
-      Serial.println(card.getUuidCard());
-      
-      if (card.getUuidCard() != nullptr && card.getUuidCard()[0] != '\0') { // Comprobación para char * vacío
-        
-
-        saveNewToken(card, request);
-        
-      } else {
-        Serial.println(F("Error registering card"));
+      if (nfcReader.detectCard())
+      {
+        delay(1000);
         lcd.clear();
         lcd.setCursor(0, 0);
-        lcd.print(F("Error, verifica"));
-        lcd.setCursor(0, 1);
-        lcd.print(F("Con. y SD card"));
-      }
-      
-    }
+        lcd.print(F("Registrando..."));
+        Serial.println(F("Registrando"));
+#if TARGET_PLATFORM == 0
+        CustomRequests request(HOST, PROXY_PORT, arduinoIp, proxyIp, currentDeviceInfo);
+#else
+        CustomRequests request(HOST, SSID, PASS_WIFI, currentDeviceInfo);
+#endif
+        Card card;
 
-  } else {
+        request.registerCard(card);
+        Serial.println(F("Esta es el uuId nuevo de la tarjeta"));
+        Serial.println(card.getUuidCard());
+
+        if (card.getUuidCard() != nullptr && card.getUuidCard()[0] != '\0')
+        { // Comprobación para char * vacío
+
+          saveNewToken(card, request);
+        }
+        else
+        {
+          Serial.println(F("Error registering card"));
+          lcd.clear();
+          lcd.setCursor(0, 0);
+          lcd.print(F("Error, verifica"));
+          lcd.setCursor(0, 1);
+          lcd.print(F("Con. y SD card"));
+        }
+      }
+  }
+  else
+  {
 
     lcd.clear();
     lcd.setCursor(0, 0);
     lcd.print(F("Transaccion"));
     lcd.setCursor(0, 1);
     lcd.print(F("Acerque tarjeta"));
-    
-    if(nfcReader.detectCard()){
-      char uuidCard[33];
-      uuidCard[32] = '\0';
-      char uuidTokensVersion[33];
-      uuidTokensVersion[32] = '\0';
 
-      char tokenDecrypted[513];
-
-      for(int i = 0; i < 513; i++)
-        tokenDecrypted[i] = '\0';
-      
-      nfcReader.readUuidCard(uuidCard);
-      nfcReader.readUuidTokensVersion(uuidTokensVersion);
-
-      #if TARGET_PLATFORM == 0
-        CustomRequests request(arduinoIp, proxyIp, currentDeviceInfo);
-      #else
-        CustomRequests request(ssd,pass, currentDeviceInfo);
-      #endif
-
-      Serial.println(F("ESte es el UUID card de la tarjeta leida"));
-      Serial.println(uuidCard);
-      Serial.println(F("Este es el uuid de la version del token"));
-      Serial.println(uuidTokensVersion);
-
-      decryptTokenCard(tokenDecrypted, request);
-
-      Serial.println(F("Este es el token descifrado de la tarjeta"));
-      Serial.println(tokenDecrypted);
-
-      Card card(uuidCard, uuidTokensVersion, tokenDecrypted);
-
-      bool status = request.validateToken(card);
-
-      if(status){
+      if (nfcReader.detectCard())
+      {
         lcd.clear();
         lcd.setCursor(0, 0);
-        lcd.print(F("Autorizado"));
-        Serial.println(F("Tarjeta autorizada"));
-        delay(1000);
-        saveNewToken(card, request);
-      }
-      else{
-        lcd.clear();
-        lcd.setCursor(0, 0);
-        lcd.print(F("No autorizado"));
-        Serial.println(F("No autorizado por cualquier razon"));
-      }
+        lcd.print(F("Procesando..."));
+        char uuidCard[33];
+        uuidCard[32] = '\0';
+        char uuidTokensVersion[33];
+        uuidTokensVersion[32] = '\0';
 
-    }
-    
+        char tokenDecrypted[513];
+
+        for (int i = 0; i < 513; i++)
+          tokenDecrypted[i] = '\0';
+
+        nfcReader.readUuidCard(uuidCard);
+        nfcReader.readUuidTokensVersion(uuidTokensVersion);
+
+#if TARGET_PLATFORM == 0
+        CustomRequests request(HOST, PROXY_PORT, arduinoIp, proxyIp, currentDeviceInfo);
+#else
+        CustomRequests request(HOST, SSID, PASS_WIFI, currentDeviceInfo);
+#endif
+
+        Serial.println(F("ESte es el UUID card de la tarjeta leida"));
+        Serial.println(uuidCard);
+        Serial.println(F("Este es el uuid de la version del token"));
+        Serial.println(uuidTokensVersion);
+
+        decryptTokenCard(tokenDecrypted, request);
+
+        Serial.println(F("Este es el token descifrado de la tarjeta"));
+        Serial.println(tokenDecrypted);
+
+        Card card(uuidCard, uuidTokensVersion, tokenDecrypted);
+
+        bool status = request.validateToken(card);
+
+        if (status)
+        {
+          lcd.clear();
+          lcd.setCursor(0, 0);
+          lcd.print(F("Autorizado"));
+          Serial.println(F("Tarjeta autorizada"));
+          delay(1000);
+          saveNewToken(card, request);
+        }
+        else
+        {
+          lcd.clear();
+          lcd.setCursor(0, 0);
+          lcd.print(F("No autorizado"));
+          Serial.println(F("No autorizado por cualquier razon"));
+        }
+      }
   }
 
   delay(2000);

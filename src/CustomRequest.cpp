@@ -5,8 +5,8 @@
     
     #include <SPI.h>
 
-    CustomRequests::CustomRequests(IPAddress arduinoIP, IPAddress proxyIP, DeviceInfo &currentDeviceInfo)
-    : _arduinoIP(arduinoIP), _proxyIP(proxyIP), _currentDeviceInfo(currentDeviceInfo)
+    CustomRequests::CustomRequests(const char * host, const int proxyPort, IPAddress arduinoIP, IPAddress proxyIP, DeviceInfo &currentDeviceInfo)
+    : _HOST(host), _proxyPort(proxyPort), _arduinoIP(arduinoIP), _proxyIP(proxyIP), _currentDeviceInfo(currentDeviceInfo)
     {
 
         Serial.println(F("Leyendo info del lector NFC"));
@@ -20,6 +20,7 @@
 
     bool CustomRequests::_connectToProxy()
     {
+        if(!_client.connected()){
         Serial.println("Iniciando Ethernet");
         delay(10);
         
@@ -29,10 +30,13 @@
         Serial.println(Ethernet.localIP());
 
         return _client.connect(_proxyIP, _proxyPort) == 1;
+        }
+        
+        return true;
     }
 
 #else 
-    CustomRequests::CustomRequests(const char * ssid, const char * pass, DeviceInfo &currentDeviceInfo) : _ssid(ssid), _pass(pass), _currentDeviceInfo(currentDeviceInfo) {
+    CustomRequests::CustomRequests(const char * host, const char * ssid, const char * pass, DeviceInfo &currentDeviceInfo) : _HOST(host), _ssid(ssid), _pass(pass), _currentDeviceInfo(currentDeviceInfo) {
     
         Serial.println(F("Esta es la información del lector"));
         Serial.println(_currentDeviceInfo.toString());
@@ -41,6 +45,7 @@
     bool CustomRequests::_connectToWiFi() {
         int count = 0;
         const int retries = 100;
+
         if(WiFi.status() != WL_CONNECTED){
             WiFi.begin(_ssid, _pass);
             Serial.println(F("Conectando a"));
@@ -59,9 +64,9 @@
 
             return true;
         }
-        else {
-            return true;
-        }
+
+        return true;
+
     }
 
 #endif

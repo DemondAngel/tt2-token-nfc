@@ -298,7 +298,7 @@ int ReaderWriter::writeBlock(int block, uint8_t* dataBytes) {
 }
 
 bool ReaderWriter::detectCard() {
-  Serial.println("Acerque una tarjeta NFC para leer...");
+  Serial.println(F("Acerque una tarjeta NFC para leer..."));
 
   _isPresent = _nfc.readPassiveTargetID(PN532_MIFARE_ISO14443A, _uid, &_uidLength, 500);
 

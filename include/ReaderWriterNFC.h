@@ -14,9 +14,13 @@ const int FINAL_SECTOR = 16;
 #if TARGET_PLATFORM == 0
   const int SDA_PIN = 20;
   const int SCL_PIN = 21;
+  const int IRQ = 2;
+  const int RST = 17;
 #else
   const int SDA_PIN = 21;
   const int SCL_PIN = 22;
+  const int IRQ = 14;
+  const int RST = 13;
 #endif
 
 
